@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.80"
+repository = "https://github.com/PrometheonOS/prometheon"
+
+[workspace.dependencies]
+# async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# serialization + schema (single source of truth for cross-language contracts)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = { version = "0.8", features = ["chrono"] }
+
+# time
+chrono = { version = "0.4", features = ["serde"] }
+
+# errors + logging
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# config
+figment = { version = "0.10", features = ["env", "toml"] }
+
+# solana streaming (Yellowstone gRPC / Dragon's Mouth)
+yellowstone-grpc-client = "13.1"
+yellowstone-grpc-proto = "12.4"
+bs58 = "0.5"
+
+# solana transaction building (client SDK)
+solana-sdk = "4"
+# instruction builders live in the modular interface crates (gated behind ser features)
+solana-system-interface = { version = "3", features = ["bincode"] }
+solana-compute-budget-interface = { version = "3", features = ["borsh"] }
+bincode = "1"
+base64 = "0.22"
+
+# HTTP client (rustls to avoid a system OpenSSL dependency)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# internal crates
+prometheon-types = { path = "crates/prometheon-types" }
+prometheon-ingest = { path = "crates/prometheon-ingest" }
+prometheon-bundle = { path = "crates/prometheon-bundle" }
+prometheon-lifecycle = { path = "crates/prometheon-lifecycle" }
+prometheon-failure = { path = "crates/prometheon-failure" }
+prometheon-retry = { path = "crates/prometheon-retry" }
+prometheon-netmodel = { path = "crates/prometheon-netmodel" }
+prometheon-telemetry = { path = "crates/prometheon-telemetry" }
+prometheon-faultinject = { path = "crates/prometheon-faultinject" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

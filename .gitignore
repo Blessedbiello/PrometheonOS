@@ -1,0 +1,31 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock.orig
+
+# Node / TS
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+.pnpm-store/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.keypair.json
+wallets/
+id.json
+
+# Data / logs (keep exported proof logs, ignore scratch)
+logs/*.scratch.*
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Docker volumes
+infra/data/

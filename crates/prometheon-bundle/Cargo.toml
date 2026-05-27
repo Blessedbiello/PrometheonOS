@@ -1,0 +1,22 @@
+[package]
+name = "prometheon-bundle"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+prometheon-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+solana-sdk = { workspace = true }
+solana-system-interface = { workspace = true }
+solana-compute-budget-interface = { workspace = true }
+bincode = { workspace = true }
+base64 = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }

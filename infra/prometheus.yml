@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # The PrometheonOS engine exposes /metrics on the host (PROMETHEUS_METRICS_ADDR, default :9100).
+  - job_name: prometheon-core
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
