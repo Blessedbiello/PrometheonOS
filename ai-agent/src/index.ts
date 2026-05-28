@@ -1,16 +1,26 @@
 /**
  * PrometheonOS AI agent entrypoint.
  *
- * Subscribes to `decision.request.*` and telemetry on NATS, runs the configured
- * `LlmProvider` (anthropic | openai | ollama), and replies with structured, schema-validated
- * decisions carrying visible reasoning. Skeleton only — implemented test-first in Phase 5.
+ * Selects the configured `LlmProvider`, connects to NATS, and serves `decision.request.*` with
+ * structured, schema-validated decisions carrying visible reasoning.
  */
+import "dotenv/config";
+import { providerFromEnv } from "./providers/index.js";
+import { runAgent } from "./nats.js";
 
 export const VERSION = "0.1.0";
 
-function main(): void {
+async function main(): Promise<void> {
+  const provider = providerFromEnv();
+  const natsUrl = process.env.NATS_URL ?? "nats://localhost:4222";
   // eslint-disable-next-line no-console
-  console.log(`PrometheonOS AI agent v${VERSION} — scaffold (Phase 5 not yet implemented)`);
+  console.log(`PrometheonOS AI agent v${VERSION} — provider=${provider.name}, nats=${natsUrl}`);
+  const nc = await runAgent(provider, natsUrl);
+  await nc.closed();
 }
 
-main();
+main().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error("agent failed:", err);
+  process.exit(1);
+});

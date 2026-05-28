@@ -1,0 +1,49 @@
+/**
+ * Shared prompt construction. All providers build the prompt the same way, so the reasoning is a
+ * function of our prompt + the model — not a single vendor's idiosyncrasies. The model is required
+ * to return ONLY a JSON object matching the `LlmDecision` shape.
+ */
+import type { DecisionRequest, DecisionType } from "./providers/types.js";
+
+const ROLE =
+  "You are the autonomous execution strategist for a Solana transaction infrastructure engine. " +
+  "You make one operational decision at a time from live network telemetry and explain it.";
+
+const OUTPUT_CONTRACT =
+  'Return ONLY a single JSON object, no prose, with exactly these keys: ' +
+  '"action" (string, a short imperative summary), ' +
+  '"reasoning" (string, why — cite the telemetry), ' +
+  '"confidence" (number 0..1), ' +
+  'and optionally "before" and "after" (objects showing the state change). ' +
+  "Do not wrap the JSON in markdown.";
+
+function guidance(decisionType: DecisionType): string {
+  switch (decisionType) {
+    case "tip":
+      return (
+        "Decide the Jito tip (lamports) for the next bundle. Balance cost against landing " +
+        "probability using the tip-floor percentiles and the congestion score. Never hardcode; " +
+        "derive the tip from the live floor."
+      );
+    case "timing":
+      return (
+        "Decide whether to submit now or hold. Consider the leader schedule (is the next leader a " +
+        "Jito leader?), slot stability, and congestion. Holding trades latency for a better window."
+      );
+    case "retry":
+      return (
+        "Decide whether and how to retry a failed submission. If the blockhash expired, refresh it " +
+        "and recalculate the tip before resubmitting. Justify retryability from the failure class."
+      );
+  }
+}
+
+/** Build the `{ system, user }` prompt for a decision request. */
+export function buildPrompt(req: DecisionRequest): { system: string; user: string } {
+  const system = `${ROLE}\n\n${guidance(req.decisionType)}\n\n${OUTPUT_CONTRACT}`;
+  const user =
+    `Decision type: ${req.decisionType}\n` +
+    `Telemetry (JSON):\n${JSON.stringify(req.context, null, 2)}\n\n` +
+    "Respond with the JSON decision object now.";
+  return { system, user };
+}

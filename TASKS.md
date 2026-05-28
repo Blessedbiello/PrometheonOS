@@ -61,12 +61,18 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] impl telemetry sinks: NATS publisher (async-nats) + Postgres/Timescale sink + Prometheus exporter — needs running services; wire at core integration
 - [ ] wire `contracts/` schema-gen (schemars → JSON Schema → TS types) + drift check
 
-## Phase 5 — AI agent `[ ]`
-- [ ] (test) `LlmProvider` MockProvider + `DecisionResult` zod schema validation
-- [ ] (test) decision logic (tip/timing/retry) on synthetic health inputs
-- [ ] (test) NATS request/reply round-trip
-- [ ] impl Anthropic/OpenAI/Ollama adapters (selected by `LLM_PROVIDER`)
-- [ ] impl decision-trace persistence
+## Phase 5 — AI agent `[~]`
+- [x] (test) zod schemas mirroring Rust `Decision` contract (`llmDecisionSchema`, `decisionSchema`) — 6 tests
+- [x] (test) `MockProvider` deterministic + context-aware (congestion→tip) — 3 tests
+- [x] (test) shared prompt builder (tip/timing/retry guidance, JSON-only) — 2 tests
+- [x] (test) `decide()` orchestrator composes valid `Decision` (provider/latency/ts/inputs) — 2 tests
+- [x] (test) model-output parsing (fences/prose/invalid) — 5 tests
+- [x] (test) `providerFromEnv` selection + missing-key errors — 7 tests
+- [x] (test) `handleDecisionRequest` parse→decide→serialize — 2 tests
+- [x] impl Anthropic/OpenAI/Ollama adapters (selected by `LLM_PROVIDER`); NATS request/reply loop; entrypoint
+- [x] CI runs ai-agent typecheck + vitest
+- [ ] impl decision-trace persistence (Postgres) — at core integration
+- [ ] (live, gated) one real-provider call test (needs an API key)
 
 ## Phase 6 — Retry + fault injection `[ ]`
 - [ ] (test) retry state machine + backoff + attempt caps

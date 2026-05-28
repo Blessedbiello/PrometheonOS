@@ -1,3 +1,7 @@
 packages:
   - "ai-agent"
   - "dashboard"
+
+# Allow native-binary build scripts for the test/build toolchain.
+onlyBuiltDependencies:
+  - esbuild
