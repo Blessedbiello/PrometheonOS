@@ -1,6 +1,11 @@
 //! `prometheon-failure`
 //!
-//! Failure classifier + taxonomy (expired blockhash, fee too low, compute exceeded, bundle failure, ...) (Phase 3).
-//!
-//! Skeleton only. Real implementation arrives test-first in its phase
-//! (see the approved plan / TASKS.md).
+//! Failure classification: maps observable signals to the failure taxonomy with a confidence score
+//! and an evidence grade (Observable vs Inferred), mirroring `docs/FAILURE-TAXONOMY.md`. The output
+//! feeds the AI agent's retry reasoning. Built test-first; pure (no network).
+
+pub mod classify;
+
+pub use classify::{
+    classify, EvidenceGrade, FailureClass, FailureClassification, FailureSignals, OnChainError,
+};

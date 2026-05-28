@@ -42,11 +42,12 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] `getTipAccounts` cache wrapper (refresh interval) — wire when integrating in core
 - [ ] (live, gated) testnet bundle submission lands — needs funded wallet + Jito endpoint
 
-## Phase 3 — Lifecycle + failure `[ ]`
-- [ ] (test) lifecycle state machine transitions + latency deltas
-- [ ] (test) failure classification from fixtures (expired blockhash, fee-too-low, compute-exceeded, bundle-failure, +extended)
-- [ ] impl stream-driven lifecycle (+ RPC cross-check)
-- [ ] impl classifier with confidence
+## Phase 3 — Lifecycle + failure `[~]`
+- [x] (test) lifecycle state machine: strict transitions, slot/ts capture, latency deltas incl. processed→confirmed (README Q1) — `TransactionLifecycle`, 7 tests
+- [x] (test) failure classification w/ confidence + observable-vs-inferred grade + retryability + precedence — `classify`, 11 tests
+- [ ] wire lifecycle to live ingest `IngestMessage` (slot/tx → advance) — integration in core
+- [ ] wire classifier inputs from `BundleStatuses`/RPC/ingest — integration in core
+- [ ] (later) RPC blockhash/height cross-check helper for expiry detection
 
 ## Phase 4 — Network model + telemetry `[ ]`
 - [ ] (test) metric computations (congestion, stability, landing prob, expiry risk, tip efficiency, ...)

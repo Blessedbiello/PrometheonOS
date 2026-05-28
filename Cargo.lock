@@ -1584,6 +1584,11 @@ dependencies = [
 [[package]]
 name = "prometheon-failure"
 version = "0.1.0"
+dependencies = [
+ "prometheon-types",
+ "schemars",
+ "serde",
+]
 
 [[package]]
 name = "prometheon-faultinject"
@@ -1608,6 +1613,13 @@ dependencies = [
 [[package]]
 name = "prometheon-lifecycle"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "prometheon-types",
+ "schemars",
+ "serde",
+ "thiserror",
+]
 
 [[package]]
 name = "prometheon-netmodel"
