@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  background: #0a0a0b;
+  color: #e5e7eb;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.mono {
+  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Subtle scanline texture for the ops-console aesthetic. */
+.ops-bg {
+  background: radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.04), transparent 40%),
+    radial-gradient(circle at 90% 100%, rgba(132, 204, 22, 0.03), transparent 40%),
+    #0a0a0b;
+}

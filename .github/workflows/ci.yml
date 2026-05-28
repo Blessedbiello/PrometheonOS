@@ -38,3 +38,5 @@ jobs:
       - run: pnpm install --frozen-lockfile=false
       - run: pnpm --filter @prometheon/ai-agent typecheck
       - run: pnpm --filter @prometheon/ai-agent test
+      - run: pnpm --filter @prometheon/dashboard typecheck
+      - run: pnpm --filter @prometheon/dashboard test

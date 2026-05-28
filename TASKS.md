@@ -84,9 +84,14 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] wire retry orchestrator to the AI agent's reasoned decision (core integration)
 - [ ] (live, gated) inject expiry on testnet → agent reasons → refresh+recalc+resubmit lands
 
-## Phase 7 — Dashboard `[ ]`
-- [ ] Next.js app scaffold + realtime transport (NATS/WebSocket)
-- [ ] panels: slots/leaders, bundles+lifecycle, retries, AI decision timeline, congestion/health
+## Phase 7 — Dashboard `[~]`
+- [x] Next.js 16 + Tailwind v4 dark ops-console scaffold (hand-rolled, no create-next-app)
+- [x] (test) telemetry types + pure formatters (lamports/ms/%/slot/truncId/stage/confidence) — 7 tests
+- [x] (test) deterministic mock state generator (slots, bundle lifecycles, AI decisions, health) — 4 tests
+- [x] panels: Header, NetworkHealth (gauges + p→c delta), SlotStream (Jito✓ flag, next-leader), Bundles (4-stage progression bar + retry/injected), Decisions (timeline + reasoning + confidence bars + before/after)
+- [x] mock `/api/telemetry` route; page polls every 1s; production build clean (Next 16, React 19)
+- [x] CI typecheck + vitest for the dashboard
+- [ ] swap mock for live NATS→SSE/WS bridge at core integration
 
 ## Phase 8 — Mainnet proof + deliverables `[ ]`
 - [ ] `scripts/run-proof.sh`: ≥10 mainnet bundles incl ≥2 failures
