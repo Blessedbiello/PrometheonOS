@@ -63,6 +63,30 @@ cargo build                   # build the engine
 cargo test                    # unit suite (no network)
 ```
 
+### Infrastructure preflight
+
+A one-command connectivity check validates everything the engine needs and prints a ✓/✗ report:
+
+```bash
+cargo run -p prometheon-core --bin preflight
+```
+
+It checks Solana RPC health + wallet balance, Jito tip-floor reachability, and (once configured)
+a live Yellowstone slot stream. Use it to confirm your environment before running the engine.
+
+### Getting unblocked
+
+1. **Wallet (dev):** a dev keypair is generated at `wallets/payer.testnet.json` (gitignored). Fund
+   it on testnet via the web faucet at <https://faucet.solana.com> (paste the address printed by
+   `solana-keygen pubkey wallets/payer.testnet.json`), or from your own machine:
+   `solana airdrop 2 <PUBKEY> --url testnet`.
+2. **Yellowstone gRPC + premium RPC:** claim the **SolInfra** infrastructure credits offered to
+   bounty builders (up to $20k: high-performance RPC + Yellowstone gRPC access) via the bounty's
+   Telegram/sponsor contact, then set `YELLOWSTONE_ENDPOINT` + `YELLOWSTONE_X_TOKEN` (and
+   `RPC_URL_MAINNET`) in `.env`. Re-run preflight to confirm the stream.
+3. **Wallet (mainnet proof):** fund `wallets/payer.mainnet.json` with ~$20–50 of SOL for the
+   explorer-verifiable proof run (Phase 8). Keep this keypair file secure.
+
 _Run instructions for the engine, AI agent, dashboard, and the mainnet proof script are added
 as each phase lands (see [`TASKS.md`](TASKS.md))._
 

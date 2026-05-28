@@ -29,6 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # config
 figment = { version = "0.10", features = ["env", "toml"] }
+dotenvy = "0.15"
 
 # solana streaming (Yellowstone gRPC / Dragon's Mouth)
 yellowstone-grpc-client = "13.1"

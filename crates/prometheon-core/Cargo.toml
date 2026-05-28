@@ -10,5 +10,19 @@ publish = false
 name = "prometheon"
 path = "src/main.rs"
 
+[[bin]]
+name = "preflight"
+path = "src/bin/preflight.rs"
+
 [dependencies]
 prometheon-types = { workspace = true }
+prometheon-ingest = { workspace = true }
+prometheon-bundle = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+bs58 = { workspace = true }
+dotenvy = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

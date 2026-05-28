@@ -17,7 +17,11 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [~] TS workspace skeleton (`pnpm-workspace.yaml`, `ai-agent` package) — Next.js app deferred to Phase 7
 - [ ] `contracts/` schema pipeline (Rust schemars → JSON Schema → TS types) — wired in Phase 4
 - [x] Verify: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo build`, `cargo test` green
-- [ ] Provision: claim SolInfra credits; fund testnet + small mainnet wallet (USER) — blocks live tests
+- [x] dev wallets generated (`wallets/payer.{testnet,mainnet}.json`, gitignored); `.env` written
+- [x] `preflight` binary: RPC health + wallet balance + Jito tip-floor + Yellowstone stream check (live tip-floor confirmed working)
+- [ ] USER: fund testnet wallet via faucet.solana.com (airdrop IP-rate-limited here)
+- [ ] USER: claim SolInfra credits → set `YELLOWSTONE_ENDPOINT`/`X_TOKEN` + `RPC_URL_MAINNET` in `.env`
+- [ ] USER: fund mainnet wallet ~$20-50 SOL for Phase 8 proof
 
 ## Phase 1 — Yellowstone ingestion `[~]`
 - [x] shared slot types in `prometheon-types` (`SlotStatus`, `Commitment`, `SlotUpdate`; serde+schemars)
