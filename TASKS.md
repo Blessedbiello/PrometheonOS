@@ -74,12 +74,15 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] impl decision-trace persistence (Postgres) — at core integration
 - [ ] (live, gated) one real-provider call test (needs an API key)
 
-## Phase 6 — Retry + fault injection `[ ]`
-- [ ] (test) retry state machine + backoff + attempt caps
-- [ ] (test) chaos assertions: blockhash expiry → detect→reason→refresh→recalc tip→resubmit
-- [ ] impl retry orchestrator wired to agent
-- [ ] impl fault scenarios (blockhash expiry [mandatory], low-tip, delayed, dropped events, congestion)
-- [ ] write `docs/EXPERIMENTS.md` results
+## Phase 6 — Retry + fault injection `[~]`
+- [x] (test) backoff math (exponential, capped, jitter) — 2 tests
+- [x] (test) retry policy: per-failure-class refresh/recalc + attempt cap + abandon — 4 tests
+- [x] (test) orchestrator: per-saga attempt tracking + backoff scheduling — 1 test
+- [x] (test) fault scenarios: blockhash expiry [mandatory], low-tip, delayed, dropped events, congestion — 6 tests
+- [x] (test) chaos loop: inject → classify → decide_retry (expiry + low-tip recovery proven) — 2 tests
+- [x] `docs/EXPERIMENTS.md` deterministic-loop results documented
+- [ ] wire retry orchestrator to the AI agent's reasoned decision (core integration)
+- [ ] (live, gated) inject expiry on testnet → agent reasons → refresh+recalc+resubmit lands
 
 ## Phase 7 — Dashboard `[ ]`
 - [ ] Next.js app scaffold + realtime transport (NATS/WebSocket)
