@@ -91,7 +91,7 @@ pub struct FailureSignals {
 }
 
 /// A classification result with confidence, grade, retryability, and a human-readable rationale.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FailureClassification {
     pub class: FailureClass,
     pub confidence: f64,

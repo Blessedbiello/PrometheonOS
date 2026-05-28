@@ -7,3 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+prometheon-types = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }

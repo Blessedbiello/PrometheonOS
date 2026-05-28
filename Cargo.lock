@@ -1624,6 +1624,12 @@ dependencies = [
 [[package]]
 name = "prometheon-netmodel"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "prometheon-types",
+ "schemars",
+ "serde",
+]
 
 [[package]]
 name = "prometheon-retry"
@@ -1632,6 +1638,16 @@ version = "0.1.0"
 [[package]]
 name = "prometheon-telemetry"
 version = "0.1.0"
+dependencies = [
+ "chrono",
+ "prometheon-failure",
+ "prometheon-lifecycle",
+ "prometheon-netmodel",
+ "prometheon-types",
+ "schemars",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "prometheon-types"

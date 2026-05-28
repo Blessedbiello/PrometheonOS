@@ -1,6 +1,15 @@
 //! `prometheon-telemetry`
 //!
-//! Telemetry pipeline: typed events to NATS, Postgres/Timescale sink, Prometheus exporter (Phase 4).
+//! The telemetry contract: a single typed [`events::TelemetryEvent`] envelope (with NATS subject
+//! mapping) and the [`decision::Decision`] AI-reasoning trace. This is the wire format shared
+//! across the Rust core, the TypeScript AI agent, and the dashboard.
 //!
-//! Skeleton only. Real implementation arrives test-first in its phase
-//! (see the approved plan / TASKS.md).
+//! The transport sinks (NATS publisher, Postgres/TimescaleDB, Prometheus exporter) wrap this
+//! contract and are wired during core integration — they require running services to exercise, so
+//! the contract (pure, serde-tested) is built first to unblock the agent + dashboard.
+
+pub mod decision;
+pub mod events;
+
+pub use decision::{Decision, DecisionType};
+pub use events::{BundleEvent, BundlePhase, FailureRecord, LifecycleRecord, TelemetryEvent};

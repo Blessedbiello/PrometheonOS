@@ -7,3 +7,11 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+prometheon-types = { workspace = true }
+prometheon-lifecycle = { workspace = true }
+prometheon-failure = { workspace = true }
+prometheon-netmodel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }

@@ -49,11 +49,13 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] wire classifier inputs from `BundleStatuses`/RPC/ingest — integration in core
 - [ ] (later) RPC blockhash/height cross-check helper for expiry detection
 
-## Phase 4 — Network model + telemetry `[ ]`
-- [ ] (test) metric computations (congestion, stability, landing prob, expiry risk, tip efficiency, ...)
-- [ ] impl `netmodel` rolling windows + `telemetry.health` snapshots
-- [ ] impl telemetry → NATS + Postgres/Timescale sink + Prometheus exporter
-- [ ] wire `contracts/` schema-gen + TS type generation + drift check
+## Phase 4 — Network model + telemetry `[~]`
+- [x] (test) `RollingWindow` (mean/variance/bounded) — 6 tests
+- [x] (test) metric fns: slot stability, congestion blend, expiry risk, landing prob, retry success, tip efficiency, cost/landing — 6 tests
+- [x] (test) `NetworkHealthModel` composes events → `HealthSnapshot` — 3 tests
+- [x] (test) telemetry envelope `TelemetryEvent` + NATS subject mapping + `Decision` contract (serde round-trip) — 5 tests; `FailureClassification` made serde
+- [ ] impl telemetry sinks: NATS publisher (async-nats) + Postgres/Timescale sink + Prometheus exporter — needs running services; wire at core integration
+- [ ] wire `contracts/` schema-gen (schemars → JSON Schema → TS types) + drift check
 
 ## Phase 5 — AI agent `[ ]`
 - [ ] (test) `LlmProvider` MockProvider + `DecisionResult` zod schema validation
