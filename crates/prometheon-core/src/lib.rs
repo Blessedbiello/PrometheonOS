@@ -5,5 +5,9 @@
 
 pub mod config;
 pub mod engine;
+pub mod rpc;
+pub mod submission;
+pub mod wallet;
 
 pub use config::{Config, Network};
+pub use submission::{next_saga_action, SagaAction, SubmissionOutcome};

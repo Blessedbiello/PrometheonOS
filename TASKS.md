@@ -97,7 +97,8 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] config loader (`prometheon-core::config`): network active-set selection + defaults — 6 tests
 - [x] NATS telemetry bus (`prometheon-telemetry::nats`): publish events + AI decision request/reply — 5 unit + 1 live round-trip
 - [x] read-only engine pipeline (`prometheon-core::engine`): Yellowstone → slot tracker → netmodel → NATS telemetry; **validated live on SolInfra mainnet** (slots streaming, congestion reacting to real skips) — 3 tests
-- [ ] bundle submit + stream-confirmed lifecycle + failure classify + retry + AI tip decision (NATS request/reply) — logic wired; live submit gated on funded wallet
+- [x] autonomous saga core (`prometheon-core::submission`): classify→retry decision + AI tip context/extraction/fallback; wallet loader; RPC blockhash/height/validity client — 14 tests. **AI-in-the-loop proven live vs. the agent**: tip re-priced 10.5k→12.5k→14.5k as congestion rose, retries refresh blockhash on expiry then land (`tests/saga_agent.rs`)
+- [ ] live on-chain submit + stream-confirmed lifecycle correlation driver — assembled + exercised during the Phase 8 mainnet proof (needs funded wallet)
 - [ ] Jito leader-window detection (`getNextScheduledLeader`) feeding submission timing
 - [ ] Postgres/Timescale sink + Prometheus `/metrics` exporter (remap docker pg to 5433; 5432 in use)
 - [ ] `contracts/` schema-gen (schemars → JSON Schema → TS types) + CI drift check

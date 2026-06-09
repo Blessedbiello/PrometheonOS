@@ -27,6 +27,7 @@ prometheon-faultinject = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true }
+solana-sdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 bs58 = { workspace = true }

@@ -1806,6 +1806,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "solana-sdk",
  "tokio",
  "tracing",
  "tracing-subscriber",
