@@ -91,7 +91,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] panels: Header, NetworkHealth (gauges + p→c delta), SlotStream (Jito✓ flag, next-leader), Bundles (4-stage progression bar + retry/injected), Decisions (timeline + reasoning + confidence bars + before/after)
 - [x] mock `/api/telemetry` route; page polls every 1s; production build clean (Next 16, React 19)
 - [x] CI typecheck + vitest for the dashboard
-- [ ] swap mock for live NATS→SSE/WS bridge at core integration
+- [x] swap mock for live NATS bridge — `lib/live.ts` reducer + live route (mock auto-fallback)
 
 ## Core integration — live wiring + telemetry sinks `[~]`
 - [x] config loader (`prometheon-core::config`): network active-set selection + defaults — 6 tests
@@ -102,7 +102,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] Jito leader-window detection (`getNextScheduledLeader`) feeding submission timing
 - [ ] Postgres/Timescale sink + Prometheus `/metrics` exporter (remap docker pg to 5433; 5432 in use)
 - [ ] `contracts/` schema-gen (schemars → JSON Schema → TS types) + CI drift check
-- [ ] dashboard live bridge (NATS → SSE/WS, replace mock)
+- [x] dashboard live bridge: NATS→`DashboardSnapshot` reducer (`dashboard/lib/live.ts`) + live `/api/telemetry` route with mock auto-fallback — 6 tests; **validated live** (real SolInfra mainnet slots streaming + live Jito tip floor in congestion)
 
 ## Phase 8 — Mainnet proof + deliverables `[ ]`
 - [ ] `scripts/run-proof.sh`: ≥10 mainnet bundles incl ≥2 failures

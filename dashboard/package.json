@@ -15,7 +15,8 @@
     "next": "^16.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "clsx": "^2.1.1"
+    "clsx": "^2.1.1",
+    "nats": "^2.29.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.0",
