@@ -20,6 +20,7 @@ sqlx = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
+dotenvy = { workspace = true }
 
 [dev-dependencies]
 futures = { workspace = true }

@@ -2119,6 +2119,7 @@ dependencies = [
  "anyhow",
  "async-nats",
  "chrono",
+ "dotenvy",
  "futures",
  "prometheon-failure",
  "prometheon-lifecycle",

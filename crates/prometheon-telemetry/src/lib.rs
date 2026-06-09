@@ -10,6 +10,7 @@
 
 pub mod decision;
 pub mod events;
+pub mod export;
 pub mod nats;
 pub mod postgres;
 

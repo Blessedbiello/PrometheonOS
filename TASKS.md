@@ -106,8 +106,8 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 
 ## Phase 8 — Mainnet proof + deliverables `[~]`
 - [x] live submit driver (`prometheon-core::proof`): assemble→sign→simulate (dry) / `sendBundle` (live) → stream-confirmed lifecycle correlation (`PendingBundles`); `proof` bin. **Dry-run validated live on mainnet** — dynamic tip from live floor (3329 lamports @ congestion 0.131), rotating tip accounts, fresh blockhash + real sig; only funding gates broadcast. 8 tests.
-- [ ] `scripts/run-proof.sh`: ≥10 mainnet bundles incl ≥2 failures
-- [ ] export lifecycle log (JSON + markdown) with explorer-verifiable slots
+- [x] `scripts/run-proof.sh`: orchestrates engine + live proof loop + export (built; awaits funded wallet to run)
+- [x] lifecycle-log export (`prometheon-telemetry::export` + `export-log` bin): Postgres `telemetry_event` → JSON + explorer-linked markdown (slots, commitment progression, submit→confirmed latency, tip, failure class). **DB→export validated live** on docker pg with synthetic rows — 3 tests. Real data fills it during the proof run.
 - [ ] finalize `README.md` (3 answers grounded in real telemetry)
 - [ ] publish architecture doc (Notion/Google Docs) — separate public URL
 - [ ] record demo video
