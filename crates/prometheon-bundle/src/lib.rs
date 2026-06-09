@@ -11,6 +11,7 @@ pub mod assembly;
 pub mod client;
 pub mod fees;
 pub mod jsonrpc;
+pub mod next_leader;
 pub mod status;
 pub mod tip;
 pub mod tip_accounts;
@@ -19,6 +20,7 @@ pub mod tip_floor;
 pub use assembly::{build_tip_bundle_tx, self_transfer_ix, serialize_tx_base64, BundleParams};
 pub use client::{BlockEngineClient, BlockEngineConfig, JitoError};
 pub use fees::{priority_fee_lamports, total_fee_lamports, BASE_FEE_LAMPORTS_PER_SIG};
+pub use next_leader::{parse_next_scheduled_leader, NextLeader};
 
 pub use status::{
     parse_bundle_statuses, parse_inflight_statuses, BundleConfirmation, BundleStatuses,

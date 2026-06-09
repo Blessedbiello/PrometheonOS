@@ -17,6 +17,7 @@ use std::time::Duration;
 use prometheon_bundle::{BlockEngineClient, BlockEngineConfig, Percentile, TipFloor};
 use prometheon_core::{
     config::Config,
+    leader::LeaderWindow,
     proof::{self, PendingBundles},
     rpc::RpcClient,
     wallet,
@@ -94,6 +95,22 @@ async fn main() -> anyhow::Result<()> {
         floor.ema50_lamports(),
         congestion
     );
+
+    // Best-effort leader-window readout (the endpoint shape varies by deployment; tolerate failure).
+    match jito.get_next_scheduled_leader().await {
+        Ok(next) => {
+            let w = LeaderWindow::from_next(&next);
+            println!(
+                "next Jito leader: slot {} ({} slots out){}\n",
+                next.next_leader_slot,
+                w.slots_until(),
+                next.next_leader_region
+                    .map(|r| format!(", region {r}"))
+                    .unwrap_or_default()
+            );
+        }
+        Err(e) => println!("next Jito leader: unavailable ({e}) — verify endpoint\n"),
+    }
 
     let mut landed = 0u32;
     let mut failed = 0u32;

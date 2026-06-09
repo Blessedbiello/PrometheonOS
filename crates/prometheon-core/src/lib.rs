@@ -5,6 +5,7 @@
 
 pub mod config;
 pub mod engine;
+pub mod leader;
 pub mod metrics;
 pub mod proof;
 pub mod rpc;

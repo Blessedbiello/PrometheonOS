@@ -234,4 +234,17 @@ impl BlockEngineClient {
             .await?;
         TipFloor::from_response_json(&body).map_err(|e| JitoError::Parse(e.to_string()))
     }
+
+    /// `getNextScheduledLeader` → the next Jito-Solana leader slot (the submission window). The exact
+    /// path/shape should be confirmed against the live Block Engine; the parser is tolerant.
+    pub async fn get_next_scheduled_leader(&self) -> Result<crate::NextLeader, JitoError> {
+        let body = self
+            .post_rpc(
+                "/api/v1/getNextScheduledLeader",
+                "getNextScheduledLeader",
+                serde_json::json!([]),
+            )
+            .await?;
+        crate::parse_next_scheduled_leader(&body).map_err(JitoError::Parse)
+    }
 }
