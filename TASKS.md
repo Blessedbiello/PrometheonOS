@@ -100,7 +100,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] autonomous saga core (`prometheon-core::submission`): classify→retry decision + AI tip context/extraction/fallback; wallet loader; RPC blockhash/height/validity client — 14 tests. **AI-in-the-loop proven live vs. the agent**: tip re-priced 10.5k→12.5k→14.5k as congestion rose, retries refresh blockhash on expiry then land (`tests/saga_agent.rs`)
 - [ ] live on-chain submit + stream-confirmed lifecycle correlation driver — assembled + exercised during the Phase 8 mainnet proof (needs funded wallet)
 - [ ] Jito leader-window detection (`getNextScheduledLeader`) feeding submission timing
-- [ ] Postgres/Timescale sink + Prometheus `/metrics` exporter (remap docker pg to 5433; 5432 in use)
+- [x] Postgres/Timescale sink (`prometheon-telemetry::postgres`): `telemetry_event` hypertable + `v_decision`/`v_bundle`/`v_lifecycle`/`v_failure` jsonb views; **validated live** (docker pg on :55432). Prometheus `/metrics` exporter (`prometheon-core::metrics`): live gauges + counters; **validated live** (`prometheon_*` served on :9100). Both wired into the engine fan-out — 4 unit + 1 live pg test
 - [ ] `contracts/` schema-gen (schemars → JSON Schema → TS types) + CI drift check
 - [x] dashboard live bridge: NATS→`DashboardSnapshot` reducer (`dashboard/lib/live.ts`) + live `/api/telemetry` route with mock auto-fallback — 6 tests; **validated live** (real SolInfra mainnet slots streaming + live Jito tip floor in congestion)
 

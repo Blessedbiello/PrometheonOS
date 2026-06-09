@@ -11,7 +11,9 @@
 pub mod decision;
 pub mod events;
 pub mod nats;
+pub mod postgres;
 
 pub use decision::{Decision, DecisionType};
 pub use events::{BundleEvent, BundlePhase, FailureRecord, LifecycleRecord, TelemetryEvent};
 pub use nats::TelemetryBus;
+pub use postgres::PostgresSink;

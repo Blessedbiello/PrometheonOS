@@ -18,7 +18,8 @@ services:
       POSTGRES_PASSWORD: prometheon
       POSTGRES_DB: prometheon
     ports:
-      - "5432:5432"
+      # Host 55432 → container 5432 (lower ports are often taken by local Postgres instances).
+      - "55432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
