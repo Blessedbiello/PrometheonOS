@@ -6,6 +6,7 @@
 pub mod config;
 pub mod engine;
 pub mod metrics;
+pub mod proof;
 pub mod rpc;
 pub mod submission;
 pub mod wallet;

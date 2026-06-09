@@ -104,7 +104,8 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] `contracts/` schema-gen: `schema-gen` bin (schemars → `contracts/json-schema/*`) + `scripts/gen-contracts.sh` (→ `contracts/ts/*.d.ts` via json-schema-to-typescript); JsonSchema derived across the contract types; **CI drift check** (`schema-gen --check`) — 2 tests
 - [x] dashboard live bridge: NATS→`DashboardSnapshot` reducer (`dashboard/lib/live.ts`) + live `/api/telemetry` route with mock auto-fallback — 6 tests; **validated live** (real SolInfra mainnet slots streaming + live Jito tip floor in congestion)
 
-## Phase 8 — Mainnet proof + deliverables `[ ]`
+## Phase 8 — Mainnet proof + deliverables `[~]`
+- [x] live submit driver (`prometheon-core::proof`): assemble→sign→simulate (dry) / `sendBundle` (live) → stream-confirmed lifecycle correlation (`PendingBundles`); `proof` bin. **Dry-run validated live on mainnet** — dynamic tip from live floor (3329 lamports @ congestion 0.131), rotating tip accounts, fresh blockhash + real sig; only funding gates broadcast. 8 tests.
 - [ ] `scripts/run-proof.sh`: ≥10 mainnet bundles incl ≥2 failures
 - [ ] export lifecycle log (JSON + markdown) with explorer-verifiable slots
 - [ ] finalize `README.md` (3 answers grounded in real telemetry)

@@ -79,6 +79,50 @@ impl RpcClient {
             .await?;
         parse_is_blockhash_valid(&v)
     }
+
+    /// `simulateTransaction` — the free dry-run: confirm a signed, base64 tx would execute against
+    /// current cluster state without broadcasting (or paying) anything.
+    pub async fn simulate_transaction(&self, tx_base64: &str) -> anyhow::Result<SimulationResult> {
+        let v = self
+            .call(
+                "simulateTransaction",
+                json!([
+                    tx_base64,
+                    { "encoding": "base64", "sigVerify": true, "commitment": "confirmed", "replaceRecentBlockhash": false }
+                ]),
+            )
+            .await?;
+        Ok(parse_simulation(&v))
+    }
+}
+
+/// Outcome of a `simulateTransaction` call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimulationResult {
+    /// `None` if the tx would succeed; otherwise the stringified on-chain error.
+    pub err: Option<String>,
+    pub logs: Vec<String>,
+    pub units_consumed: Option<u64>,
+}
+
+impl SimulationResult {
+    pub fn succeeded(&self) -> bool {
+        self.err.is_none()
+    }
+
+    /// True if the only thing blocking the tx is funding — the signal we expect on the *unfunded*
+    /// mainnet wallet during a dry-run (everything else assembled + verified correctly).
+    pub fn is_insufficient_funds(&self) -> bool {
+        self.err
+            .as_deref()
+            .map(|e| {
+                let e = e.to_lowercase();
+                e.contains("insufficient")
+                    || e.contains("accountnotfound")
+                    || e.contains("account not found")
+            })
+            .unwrap_or(false)
+    }
 }
 
 fn result<'a>(v: &'a Value, method: &str) -> anyhow::Result<&'a Value> {
@@ -119,6 +163,39 @@ pub fn parse_is_blockhash_valid(v: &Value) -> anyhow::Result<bool> {
         .ok_or_else(|| anyhow::anyhow!("isBlockhashValid: missing value"))
 }
 
+/// Parse a `simulateTransaction` response (`result.value` = `{ err, logs, unitsConsumed }`).
+/// Tolerant: a missing `result` (RPC-level error) is surfaced as a failed simulation, not a panic.
+pub fn parse_simulation(v: &Value) -> SimulationResult {
+    let value = match result(v, "simulateTransaction") {
+        Ok(r) => &r["value"],
+        Err(e) => {
+            return SimulationResult {
+                err: Some(e.to_string()),
+                logs: Vec::new(),
+                units_consumed: None,
+            }
+        }
+    };
+    let err = match &value["err"] {
+        Value::Null => None,
+        other => Some(other.to_string()),
+    };
+    let logs = value["logs"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|l| l.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    let units_consumed = value["unitsConsumed"].as_u64();
+    SimulationResult {
+        err,
+        logs,
+        units_consumed,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +223,37 @@ mod tests {
     fn parses_block_height() {
         let v = json!({ "jsonrpc": "2.0", "id": 1, "result": 396_822_851u64 });
         assert_eq!(parse_block_height(&v).unwrap(), 396_822_851);
+    }
+
+    #[test]
+    fn parses_successful_simulation() {
+        let v = json!({
+            "result": { "context": { "slot": 1 },
+                "value": { "err": null, "logs": ["Program 11111111111111111111111111111111 success"], "unitsConsumed": 450 } }
+        });
+        let sim = parse_simulation(&v);
+        assert!(sim.succeeded());
+        assert_eq!(sim.units_consumed, Some(450));
+        assert_eq!(sim.logs.len(), 1);
+    }
+
+    #[test]
+    fn parses_insufficient_funds_simulation() {
+        // The expected dry-run result on an unfunded wallet: assembled fine, only funding blocks it.
+        let v = json!({
+            "result": { "context": { "slot": 1 },
+                "value": { "err": { "InsufficientFundsForRent": { "account_index": 0 } }, "logs": [], "unitsConsumed": 0 } }
+        });
+        let sim = parse_simulation(&v);
+        assert!(!sim.succeeded());
+        assert!(sim.is_insufficient_funds());
+    }
+
+    #[test]
+    fn rpc_level_error_is_a_failed_simulation_not_a_panic() {
+        let v = json!({ "error": { "code": -32602, "message": "invalid tx" } });
+        let sim = parse_simulation(&v);
+        assert!(!sim.succeeded());
     }
 
     #[test]
