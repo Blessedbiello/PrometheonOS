@@ -70,7 +70,15 @@ Bidirectional `Subscribe`; named filter maps (`slots`, `transactions`/`transacti
 `accounts`, `blocks`...); request-global commitment; `from_slot` replay (~1000-slot buffer);
 server `Ping`→client `ping{id}` keepalive; bounded-channel + worker-pool backpressure; zstd; raise
 max decode size.
-## 14. Commitment tracking logic _(pending — Phase 3)_
+## 14. Commitment tracking logic
+A per-submission state machine (`prometheon-lifecycle`) advances `Submitted → Processed → Confirmed
+→ Finalized` (with `Failed`/`Expired`/`Dropped` branches), capturing the slot, timestamp, and
+inter-stage delta at each transition; illegal transitions are rejected so the recorded history is
+always a valid path. It is driven by the **stream**: `prometheon-core::proof::PendingBundles`
+correlates our submitted signatures to the right lifecycle — a tx-status event marks `Processed`
+(capturing the landed slot), and that slot's later `Confirmed`/`Finalized` slot-status events
+advance it. RPC (`getBlockHeight`/`isBlockhashValid`, `getBundleStatuses`) is only a cross-check.
+The `processed→confirmed` delta is surfaced as a consensus-health signal (README Q1).
 ## 15. Performance considerations
 Per-component latency sensitivity:
 - **ingest** (high) — must keep pace with the tip; backpressure via bounded channel + worker pool;
@@ -93,3 +101,28 @@ No secrets in repo; keypairs gitignored; minimal mainnet funds; tip co-location 
 on failed bundles; pre/post account checks guard against uncled-block rebroadcast.
 ## 19. Cost analysis _(pending — actuals from the mainnet proof run)_
 ## 20. Lessons learned _(pending — Phase 8)_
+
+## 21. Implementation status & live validation
+The engine is wired end-to-end and validated against the **live SolInfra mainnet stream** (gRPC
+`fra.grpc.solinfra.dev:443`), not just unit-tested in isolation:
+
+- **Ingestion → health → sinks.** `prometheon-core::engine` streams Yellowstone slots into the
+  `NetworkHealthModel` and fans every `TelemetryEvent` through one `emit`: NATS pub/sub, a
+  Postgres/TimescaleDB hypertable (`telemetry_event` + `v_decision`/`v_bundle`/`v_lifecycle`/
+  `v_failure` projection views), and a Prometheus `/metrics` exporter. Validated live: slots
+  streaming, congestion reacting to a real leader skip (stability `1.0 → 0.889`), 60 events on the
+  bus, rows in Postgres, `prometheon_*` gauges served.
+- **AI strategist in the loop.** The tip decision is owned by the TypeScript agent over NATS
+  (`decision.request.tip`); proven end-to-end against the running agent — the tip re-priced
+  `10.5k → 12.5k → 14.5k` lamports as congestion rose while the saga drove autonomous retries
+  (refresh blockhash on expiry, re-price always) to a landing.
+- **Submit path.** `prometheon-core::proof` assembles a real bundle from live data (fresh blockhash,
+  rotating tip account, live-floor tip, congestion-scaled CU price), signs it, and either simulates
+  (free dry-run) or submits + stream-tracks the lifecycle. Dry-run validated on mainnet: a dynamic
+  3329-lamport tip, 4 rotating tip accounts, distinct blockhashes/signatures; the simulator returns
+  `AccountNotFound`, i.e. assembled correctly — only funding gates broadcast.
+- **One contract.** Rust telemetry types (`schemars`) generate `contracts/json-schema/*` and the TS
+  types; CI fails on drift. The dashboard consumes the live NATS feed (mock auto-fallback).
+
+Remaining: the funded mainnet proof run (`scripts/run-proof.sh`) to produce the explorer-verifiable
+lifecycle log, and §19/§20 actuals + lessons from it.
