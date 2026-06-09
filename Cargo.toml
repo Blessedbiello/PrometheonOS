@@ -31,6 +31,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 figment = { version = "0.10", features = ["env", "toml"] }
 dotenvy = "0.15"
 
+# messaging bus (telemetry pub/sub + AI decision request/reply)
+async-nats = "0.49"
+
 # solana streaming (Yellowstone gRPC / Dragon's Mouth)
 yellowstone-grpc-client = "13.1"
 yellowstone-grpc-proto = "12.4"

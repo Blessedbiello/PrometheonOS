@@ -1,12 +1,29 @@
-//! `prometheon-core` — orchestrator binary.
+//! `prometheon-core` — the orchestrator binary.
 //!
-//! Wires the engine crates, the NATS decision request/reply channel, and config.
-//! Skeleton only; real wiring arrives in later phases.
+//! Loads `.env` config, brings up the engine, and runs the orchestration loop. The wiring itself
+//! lives in [`prometheon_core::engine`] so it stays testable; this entrypoint is intentionally thin.
 
-fn main() {
-    println!(
-        "PrometheonOS — Autonomous Solana Execution Intelligence Engine (v{})",
-        env!("CARGO_PKG_VERSION")
+use prometheon_core::{engine, Config};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let _ = dotenvy::dotenv();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_env("LOG_LEVEL")
+                .or_else(|_| tracing_subscriber::EnvFilter::try_new("info"))
+                .unwrap(),
+        )
+        .init();
+
+    let config = Config::from_env()?;
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        network = config.network.as_str(),
+        yellowstone = config.yellowstone_ready(),
+        "PrometheonOS — Autonomous Solana Execution Intelligence Engine"
     );
-    println!("scaffold: no engine wired yet. See TASKS.md for phase status.");
+
+    engine::run(config).await
 }

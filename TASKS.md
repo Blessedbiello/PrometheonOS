@@ -20,7 +20,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] dev wallets generated (`wallets/payer.{testnet,mainnet}.json`, gitignored); `.env` written
 - [x] `preflight` binary: RPC health + wallet balance + Jito tip-floor + Yellowstone stream check (live tip-floor confirmed working)
 - [ ] USER: fund testnet wallet via faucet.solana.com (airdrop IP-rate-limited here)
-- [ ] USER: claim SolInfra credits → set `YELLOWSTONE_ENDPOINT`/`X_TOKEN` + `RPC_URL_MAINNET` in `.env`
+- [x] USER: claimed SolInfra credits — `Ace` plan (FRA, mainnet); `YELLOWSTONE_ENDPOINT`/`X_TOKEN` + `RPC_URL_MAINNET` in `.env`; validated live (preflight ✓ + engine ✓)
 - [ ] USER: fund mainnet wallet ~$20-50 SOL for Phase 8 proof
 
 ## Phase 1 — Yellowstone ingestion `[~]`
@@ -31,7 +31,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] (test) proto-discriminant status mapping + `SubscribeRequest` builder — `status_map`, `yellowstone`, tests green
 - [x] impl live Yellowstone client: slots+tx subscriptions, keepalive ping (both directions), `x-token` auth, TLS — `yellowstone::spawn` (yellowstone-grpc-client 13.1)
 - [x] impl reconnect supervise loop (`from_slot` optimistic replay + fallback) + DropNewest backpressure forwarding w/ counters
-- [ ] (live, gated) testnet smoke test — needs SolInfra endpoint + x-token
+- [x] (live) Yellowstone smoke test — SolInfra mainnet stream validated end-to-end (preflight + engine: slots → netmodel → NATS)
 - [ ] verify provider: inter-slot statuses + `from_slot` buffer size — needs live endpoint
 - [ ] later: dedupe replayed updates (lifecycle layer); leader-schedule monitor (Jito `getNextScheduledLeader`, Phase 2)
 
@@ -92,6 +92,16 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] mock `/api/telemetry` route; page polls every 1s; production build clean (Next 16, React 19)
 - [x] CI typecheck + vitest for the dashboard
 - [ ] swap mock for live NATS→SSE/WS bridge at core integration
+
+## Core integration — live wiring + telemetry sinks `[~]`
+- [x] config loader (`prometheon-core::config`): network active-set selection + defaults — 6 tests
+- [x] NATS telemetry bus (`prometheon-telemetry::nats`): publish events + AI decision request/reply — 5 unit + 1 live round-trip
+- [x] read-only engine pipeline (`prometheon-core::engine`): Yellowstone → slot tracker → netmodel → NATS telemetry; **validated live on SolInfra mainnet** (slots streaming, congestion reacting to real skips) — 3 tests
+- [ ] bundle submit + stream-confirmed lifecycle + failure classify + retry + AI tip decision (NATS request/reply) — logic wired; live submit gated on funded wallet
+- [ ] Jito leader-window detection (`getNextScheduledLeader`) feeding submission timing
+- [ ] Postgres/Timescale sink + Prometheus `/metrics` exporter (remap docker pg to 5433; 5432 in use)
+- [ ] `contracts/` schema-gen (schemars → JSON Schema → TS types) + CI drift check
+- [ ] dashboard live bridge (NATS → SSE/WS, replace mock)
 
 ## Phase 8 — Mainnet proof + deliverables `[ ]`
 - [ ] `scripts/run-proof.sh`: ≥10 mainnet bundles incl ≥2 failures
