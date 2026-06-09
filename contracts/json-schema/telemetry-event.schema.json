@@ -1,0 +1,523 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TelemetryEvent",
+  "description": "The single telemetry envelope. `kind` tags the variant on the wire.",
+  "oneOf": [
+    {
+      "description": "A normalized slot update emitted by the ingestion layer (decoupled from the raw proto).\n\n`parent` is `None` only when the stream did not provide it; when present it references a *produced* block (skipped slots are never parents), which is what lets us detect ingestion gaps by checking whether we ever saw the referenced parent.",
+      "type": "object",
+      "required": [
+        "kind",
+        "slot",
+        "status",
+        "ts"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "slot"
+          ]
+        },
+        "parent": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "slot": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "status": {
+          "$ref": "#/definitions/SlotStatus"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "description": "A bundle telemetry event.",
+      "type": "object",
+      "required": [
+        "bundle_id",
+        "kind",
+        "phase",
+        "region",
+        "signatures",
+        "tip_account",
+        "tip_lamports",
+        "ts"
+      ],
+      "properties": {
+        "bundle_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bundle"
+          ]
+        },
+        "phase": {
+          "$ref": "#/definitions/BundlePhase"
+        },
+        "region": {
+          "type": "string"
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tip_account": {
+          "type": "string"
+        },
+        "tip_lamports": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "description": "A lifecycle transition tagged with the bundle/signature it belongs to.",
+      "type": "object",
+      "required": [
+        "event",
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/LifecycleEvent"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "lifecycle"
+          ]
+        }
+      }
+    },
+    {
+      "description": "A failure classification tagged with the bundle/signature it belongs to.",
+      "type": "object",
+      "required": [
+        "classification",
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "classification": {
+          "$ref": "#/definitions/FailureClassification"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "failure"
+          ]
+        }
+      }
+    },
+    {
+      "description": "A point-in-time network-health + execution-quality snapshot.",
+      "type": "object",
+      "required": [
+        "bundle_landing_probability",
+        "congestion_score",
+        "kind",
+        "retry_success_rate",
+        "slot_stability_score",
+        "tip_efficiency_ratio",
+        "tip_floor_lamports",
+        "ts"
+      ],
+      "properties": {
+        "avg_confirmed_latency_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "bundle_landing_probability": {
+          "type": "number",
+          "format": "double"
+        },
+        "confirm_latency_variance_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "congestion_score": {
+          "type": "number",
+          "format": "double"
+        },
+        "cost_per_successful_landing": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "health"
+          ]
+        },
+        "retry_success_rate": {
+          "type": "number",
+          "format": "double"
+        },
+        "slot_stability_score": {
+          "type": "number",
+          "format": "double"
+        },
+        "tip_efficiency_ratio": {
+          "type": "number",
+          "format": "double"
+        },
+        "tip_floor_lamports": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "description": "An AI decision with the full reasoning trace required for judge-visible \"AI Demonstration\".",
+      "type": "object",
+      "required": [
+        "action",
+        "confidence",
+        "decision_type",
+        "inputs_considered",
+        "kind",
+        "latency_ms",
+        "provider",
+        "reasoning",
+        "ts"
+      ],
+      "properties": {
+        "action": {
+          "description": "Short, human-readable action (e.g. `\"tip 12000->18000 lamports\"`).",
+          "type": "string"
+        },
+        "after": {
+          "description": "State after the decision, if applicable."
+        },
+        "before": {
+          "description": "State before the decision (for before/after comparison), if applicable."
+        },
+        "confidence": {
+          "description": "Confidence in `[0,1]`.",
+          "type": "number",
+          "format": "double"
+        },
+        "decision_type": {
+          "$ref": "#/definitions/DecisionType"
+        },
+        "inputs_considered": {
+          "description": "Structured snapshot of the inputs the agent considered."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "decision"
+          ]
+        },
+        "latency_ms": {
+          "description": "How long the decision took (ms) — observability for the AI path.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "provider": {
+          "description": "Which provider produced the decision (`anthropic` | `openai` | `ollama`).",
+          "type": "string"
+        },
+        "reasoning": {
+          "description": "The model's reasoning for this decision.",
+          "type": "string"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "BundlePhase": {
+      "description": "Phase of a bundle's submission, for the bundle telemetry stream.",
+      "oneOf": [
+        {
+          "description": "We sent the bundle to the Block Engine.",
+          "type": "string",
+          "enum": [
+            "submitted"
+          ]
+        },
+        {
+          "description": "The Block Engine acknowledged it (we have a bundle id).",
+          "type": "string",
+          "enum": [
+            "acked"
+          ]
+        },
+        {
+          "description": "A status poll updated the bundle's state.",
+          "type": "string",
+          "enum": [
+            "status_update"
+          ]
+        }
+      ]
+    },
+    "DecisionType": {
+      "description": "Which operational decision the agent made.",
+      "oneOf": [
+        {
+          "description": "How much to tip for a bundle.",
+          "type": "string",
+          "enum": [
+            "tip"
+          ]
+        },
+        {
+          "description": "Whether to submit now or hold.",
+          "type": "string",
+          "enum": [
+            "timing"
+          ]
+        },
+        {
+          "description": "Whether/how to retry a failed submission.",
+          "type": "string",
+          "enum": [
+            "retry"
+          ]
+        }
+      ]
+    },
+    "EvidenceGrade": {
+      "description": "Whether a classification is directly observed or inferred from a pattern of signals.",
+      "type": "string",
+      "enum": [
+        "observable",
+        "inferred"
+      ]
+    },
+    "FailureClass": {
+      "description": "The taxonomy class of a failure.",
+      "type": "string",
+      "enum": [
+        "expired_blockhash",
+        "fee_too_low",
+        "compute_exceeded",
+        "bundle_failure",
+        "leader_miss",
+        "skipped_slot",
+        "duplicate_signature",
+        "instruction_error",
+        "confirmation_timeout",
+        "unclassified"
+      ]
+    },
+    "FailureClassification": {
+      "description": "A classification result with confidence, grade, retryability, and a human-readable rationale.",
+      "type": "object",
+      "required": [
+        "class",
+        "confidence",
+        "grade",
+        "rationale",
+        "retryable"
+      ],
+      "properties": {
+        "class": {
+          "$ref": "#/definitions/FailureClass"
+        },
+        "confidence": {
+          "type": "number",
+          "format": "double"
+        },
+        "grade": {
+          "$ref": "#/definitions/EvidenceGrade"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "LifecycleEvent": {
+      "description": "One recorded lifecycle transition.",
+      "type": "object",
+      "required": [
+        "stage",
+        "ts"
+      ],
+      "properties": {
+        "delta_ms_from_prev": {
+          "description": "Milliseconds since the previous recorded event (`None` for the first, Submitted).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "slot": {
+          "description": "Slot associated with the stage (absent for some failures like pre-inclusion expiry).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "stage": {
+          "$ref": "#/definitions/LifecycleStage"
+        },
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "LifecycleStage": {
+      "description": "A stage in one submission's lifecycle.",
+      "oneOf": [
+        {
+          "description": "Bundle accepted by the Block Engine (we have a bundle id).",
+          "type": "string",
+          "enum": [
+            "submitted"
+          ]
+        },
+        {
+          "description": "Seen in a block (slot `processed`); not yet voted — fork-revertible.",
+          "type": "string",
+          "enum": [
+            "processed"
+          ]
+        },
+        {
+          "description": "Slot reached `confirmed` (supermajority optimistic vote).",
+          "type": "string",
+          "enum": [
+            "confirmed"
+          ]
+        },
+        {
+          "description": "Slot reached `finalized` (rooted, irreversible). Terminal success.",
+          "type": "string",
+          "enum": [
+            "finalized"
+          ]
+        },
+        {
+          "description": "Failed: on-chain error, bundle rejected, or the processed slot went dead. Terminal.",
+          "type": "string",
+          "enum": [
+            "failed"
+          ]
+        },
+        {
+          "description": "Blockhash expired before inclusion (block height passed `lastValidBlockHeight`). Terminal.",
+          "type": "string",
+          "enum": [
+            "expired"
+          ]
+        },
+        {
+          "description": "Dropped: leader skipped / no landing in the validity window. Terminal.",
+          "type": "string",
+          "enum": [
+            "dropped"
+          ]
+        }
+      ]
+    },
+    "SlotStatus": {
+      "description": "Slot lifecycle status as surfaced by the Yellowstone slots subscription.\n\nOrdering of the variants follows the real progression of a healthy slot: `FirstShredReceived → CreatedBank → Completed → Processed → Confirmed → Finalized`, with `Dead` as the off-ramp for a slot whose bank was abandoned (forked out).\n\nThe first three (\"inter-slot\") statuses are gated behind the provider's `interslot_updates` support; the engine must degrade gracefully to the commitment statuses when they are absent (flagged for experimental verification against the configured provider).",
+      "oneOf": [
+        {
+          "description": "Leader started producing the block; earliest possible signal. (inter-slot)",
+          "type": "string",
+          "enum": [
+            "first_shred_received"
+          ]
+        },
+        {
+          "description": "Validator created a bank for the slot and began replay. (inter-slot)",
+          "type": "string",
+          "enum": [
+            "created_bank"
+          ]
+        },
+        {
+          "description": "Block fully received/replayed and the bank frozen. (inter-slot)",
+          "type": "string",
+          "enum": [
+            "completed"
+          ]
+        },
+        {
+          "description": "`processed` commitment: in a block, no supermajority vote yet, fork-revertible.",
+          "type": "string",
+          "enum": [
+            "processed"
+          ]
+        },
+        {
+          "description": "`confirmed` commitment: supermajority (optimistic) vote observed.",
+          "type": "string",
+          "enum": [
+            "confirmed"
+          ]
+        },
+        {
+          "description": "`finalized` commitment: rooted, irreversible (32-deep lockout).",
+          "type": "string",
+          "enum": [
+            "finalized"
+          ]
+        },
+        {
+          "description": "The bank for this slot was marked dead (abandoned / forked out).",
+          "type": "string",
+          "enum": [
+            "dead"
+          ]
+        }
+      ]
+    }
+  }
+}

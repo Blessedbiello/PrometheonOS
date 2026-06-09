@@ -40,21 +40,21 @@ pub struct BundleEvent {
 }
 
 /// A lifecycle transition tagged with the bundle/signature it belongs to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LifecycleRecord {
     pub id: String,
     pub event: LifecycleEvent,
 }
 
 /// A failure classification tagged with the bundle/signature it belongs to.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct FailureRecord {
     pub id: String,
     pub classification: FailureClassification,
 }
 
 /// The single telemetry envelope. `kind` tags the variant on the wire.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TelemetryEvent {
     Slot(SlotUpdate),

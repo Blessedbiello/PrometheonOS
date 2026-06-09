@@ -8,10 +8,11 @@
 //! Pure and fully unit-tested — no network. The AI agent (Phase 5) consumes the classification +
 //! confidence to reason about retries rather than re-deriving it.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A decoded on-chain error (from `getBundleStatuses.err` / RPC).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum OnChainError {
     /// Transaction exceeded its compute-unit budget.
     ComputeBudgetExceeded,
@@ -24,7 +25,7 @@ pub enum OnChainError {
 }
 
 /// Whether a classification is directly observed or inferred from a pattern of signals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceGrade {
     Observable,
@@ -32,7 +33,7 @@ pub enum EvidenceGrade {
 }
 
 /// The taxonomy class of a failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureClass {
     ExpiredBlockhash,
@@ -91,7 +92,7 @@ pub struct FailureSignals {
 }
 
 /// A classification result with confidence, grade, retryability, and a human-readable rationale.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct FailureClassification {
     pub class: FailureClass,
     pub confidence: f64,

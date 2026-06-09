@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Decision",
+  "description": "An AI decision with the full reasoning trace required for judge-visible \"AI Demonstration\".",
+  "type": "object",
+  "required": [
+    "action",
+    "confidence",
+    "decision_type",
+    "inputs_considered",
+    "latency_ms",
+    "provider",
+    "reasoning",
+    "ts"
+  ],
+  "properties": {
+    "action": {
+      "description": "Short, human-readable action (e.g. `\"tip 12000->18000 lamports\"`).",
+      "type": "string"
+    },
+    "after": {
+      "description": "State after the decision, if applicable."
+    },
+    "before": {
+      "description": "State before the decision (for before/after comparison), if applicable."
+    },
+    "confidence": {
+      "description": "Confidence in `[0,1]`.",
+      "type": "number",
+      "format": "double"
+    },
+    "decision_type": {
+      "$ref": "#/definitions/DecisionType"
+    },
+    "inputs_considered": {
+      "description": "Structured snapshot of the inputs the agent considered."
+    },
+    "latency_ms": {
+      "description": "How long the decision took (ms) — observability for the AI path.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "provider": {
+      "description": "Which provider produced the decision (`anthropic` | `openai` | `ollama`).",
+      "type": "string"
+    },
+    "reasoning": {
+      "description": "The model's reasoning for this decision.",
+      "type": "string"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "definitions": {
+    "DecisionType": {
+      "description": "Which operational decision the agent made.",
+      "oneOf": [
+        {
+          "description": "How much to tip for a bundle.",
+          "type": "string",
+          "enum": [
+            "tip"
+          ]
+        },
+        {
+          "description": "Whether to submit now or hold.",
+          "type": "string",
+          "enum": [
+            "timing"
+          ]
+        },
+        {
+          "description": "Whether/how to retry a failed submission.",
+          "type": "string",
+          "enum": [
+            "retry"
+          ]
+        }
+      ]
+    }
+  }
+}

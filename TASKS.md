@@ -101,7 +101,7 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [ ] live on-chain submit + stream-confirmed lifecycle correlation driver — assembled + exercised during the Phase 8 mainnet proof (needs funded wallet)
 - [ ] Jito leader-window detection (`getNextScheduledLeader`) feeding submission timing
 - [x] Postgres/Timescale sink (`prometheon-telemetry::postgres`): `telemetry_event` hypertable + `v_decision`/`v_bundle`/`v_lifecycle`/`v_failure` jsonb views; **validated live** (docker pg on :55432). Prometheus `/metrics` exporter (`prometheon-core::metrics`): live gauges + counters; **validated live** (`prometheon_*` served on :9100). Both wired into the engine fan-out — 4 unit + 1 live pg test
-- [ ] `contracts/` schema-gen (schemars → JSON Schema → TS types) + CI drift check
+- [x] `contracts/` schema-gen: `schema-gen` bin (schemars → `contracts/json-schema/*`) + `scripts/gen-contracts.sh` (→ `contracts/ts/*.d.ts` via json-schema-to-typescript); JsonSchema derived across the contract types; **CI drift check** (`schema-gen --check`) — 2 tests
 - [x] dashboard live bridge: NATS→`DashboardSnapshot` reducer (`dashboard/lib/live.ts`) + live `/api/telemetry` route with mock auto-fallback — 6 tests; **validated live** (real SolInfra mainnet slots streaming + live Jito tip floor in congestion)
 
 ## Phase 8 — Mainnet proof + deliverables `[ ]`

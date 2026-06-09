@@ -10,10 +10,11 @@
 
 use chrono::{DateTime, Utc};
 use prometheon_types::Slot;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A stage in one submission's lifecycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LifecycleStage {
     /// Bundle accepted by the Block Engine (we have a bundle id).
@@ -75,7 +76,7 @@ pub enum TransitionOutcome {
 }
 
 /// One recorded lifecycle transition.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LifecycleEvent {
     pub stage: LifecycleStage,
     /// Slot associated with the stage (absent for some failures like pre-inclusion expiry).

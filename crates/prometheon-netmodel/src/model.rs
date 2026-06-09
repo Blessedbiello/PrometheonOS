@@ -7,6 +7,7 @@
 //! depends on a specific tx's remaining blocks.
 
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::metrics::{
@@ -16,7 +17,7 @@ use crate::metrics::{
 use crate::window::RollingWindow;
 
 /// A point-in-time network-health + execution-quality snapshot.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct HealthSnapshot {
     pub ts: DateTime<Utc>,
     pub congestion_score: f64,
