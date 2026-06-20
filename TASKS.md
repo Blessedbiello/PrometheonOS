@@ -106,8 +106,27 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 
 ## Phase 8 — Mainnet proof + deliverables `[~]`
 - [x] live submit driver (`prometheon-core::proof`): assemble→sign→simulate (dry) / `sendBundle` (live) → stream-confirmed lifecycle correlation (`PendingBundles`); `proof` bin. **Dry-run validated live on mainnet** — dynamic tip from live floor (3329 lamports @ congestion 0.131), rotating tip accounts, fresh blockhash + real sig; only funding gates broadcast. 8 tests.
-- [x] `scripts/run-proof.sh`: orchestrates engine + live proof loop + export (built; awaits funded wallet to run)
+- [x] `scripts/run-proof.sh`: one shared stream + live proof loop (incl. injected failures) + export (built; awaits funded wallet to run)
 - [x] lifecycle-log export (`prometheon-telemetry::export` + `export-log` bin): Postgres `telemetry_event` → JSON + explorer-linked markdown (slots, commitment progression, submit→confirmed latency, tip, failure class). **DB→export validated live** on docker pg with synthetic rows — 3 tests. Real data fills it during the proof run.
 - [ ] finalize `README.md` (3 answers grounded in real telemetry)
 - [ ] publish architecture doc (Notion/Google Docs) — separate public URL
 - [ ] record demo video
+
+## Review remediation (2026-06-12) `[x]` — closes the pipeline-integrity gaps a deep review surfaced
+- [x] **T1** submit→telemetry→export wired: shared `prometheon-core::sinks` (`EventSink`/`Sinks`), new
+  `prometheon-core::proof_run` emits `Bundle`/`Lifecycle`/`Failure` events; network-free regression
+  `tests/proof_pipeline.rs` asserts a populated log (≥10 landed + ≥2 classified failures). Was: the
+  proof tracked landings in memory only → exported log came out empty.
+- [x] **T2** fault injection in the live proof (`--inject low-tip,stale-blockhash`) → guarantees the
+  bounty's ≥2 classified failure cases.
+- [x] **T3** single shared Yellowstone stream for the whole run; `run-proof.sh` no longer co-launches
+  the engine (respects the 1-stream SolInfra plan).
+- [x] **T4** AI-chosen tip clamped to policy bounds (`proof::bounded_tip`) — defense-in-depth vs decision poisoning.
+- [x] **T5** "landed" now requires stream-`confirmed` (`TransactionLifecycle::reached_confirmed`), not `processed` alone.
+- [x] **T6** lifecycle tolerates a missed intermediate stage (forward-skip transitions); backward transitions still rejected.
+- [x] **T7** Anthropic default model → `claude-opus-4-8`.
+- [x] **T8** dashboard honesty: `DashboardSnapshot.source` (`live|mock`) → badge reads "live"/"simulated", never "live" over mock.
+- [x] **T9** CI: advisory `cargo audit` + `pnpm audit` job; `proof_pipeline.rs` runs in `cargo test --workspace`.
+- [x] **T10** README/ARCHITECTURE corrected to true scope (read-only spine validated live; submit pipeline integration-tested; live paid proof = gated final step).
+- [x] **T11** `EXPERIMENTS.md` filled with the proven deterministic chaos-loop + pipeline results.
+- [ ] **T12 (gated on funding)** funded `NETWORK=mainnet ./scripts/run-proof.sh 12` with `LLM_PROVIDER=anthropic` → populated `logs/lifecycle-log.{json,md}` (≥10 bundles, ≥2 failures, explorer-verifiable slots) + a real AI reasoning trace; fill README/EXPERIMENTS live numbers; record demo.

@@ -19,18 +19,33 @@ Implemented in `prometheon-faultinject` (Phase 6); results filled from real runs
 
 ## Deterministic recovery loop (proven in tests)
 
-Before the live runs, the chaos → classify → recover loop is proven deterministically in
-`prometheon-faultinject/tests/chaos_loop.rs`:
+Before any live run, the chaos → classify → recover loop is proven deterministically in
+`prometheon-faultinject/tests/chaos_loop.rs` (both tests green in CI):
 
-- **Blockhash expiry (mandatory):** `FaultScenario::BlockhashExpiry` → `classify` returns
-  `ExpiredBlockhash` (confidence ≥ 0.9, retryable) → `decide_retry` returns
-  `Retry { refresh_blockhash: true, recalc_tip: true, next_attempt: 2 }`. The engine refreshes the
-  blockhash, re-prices the tip from live data, and resubmits.
-- **Low tip:** `FaultScenario::LowTip` (window open) → `FeeTooLow` → `Retry { refresh_blockhash:
-  false, recalc_tip: true }` (raise the tip; the blockhash is still valid).
+- **Blockhash expiry (mandatory).** `FaultScenario::BlockhashExpiry.apply(signals)` sets
+  `block_height_exceeded = true`, `blockhash_valid = Some(false)`, `landed = false`. `classify`
+  returns `class = ExpiredBlockhash`, `confidence = 0.92`, `grade = Observable`, `retryable = true`.
+  `decide_retry(ExpiredBlockhash, attempt 1, max 3)` returns
+  `Retry { refresh_blockhash: true, recalc_tip: true, next_attempt: 2 }` — refresh the blockhash,
+  re-price the tip from live data, resubmit.
+- **Low tip (window open).** `FaultScenario::LowTip { tip_lamports: 500 }` with `blockhash_valid =
+  Some(true)`. `classify` returns `class = FeeTooLow`, `retryable = true`. `decide_retry` returns
+  `Retry { refresh_blockhash: false, recalc_tip: true }` — raise the tip only; the blockhash is
+  still valid, so it is **not** refreshed.
 
-In the live run (Phase 8) the deterministic `decide_retry` policy is replaced by the AI agent's
-reasoned decision over the same signals — same loop, with a visible reasoning trace.
+## Submit → telemetry → export pipeline (proven without network)
+
+`prometheon-core/tests/proof_pipeline.rs` drives the integrated proof driver
+(`proof_run::track_and_emit`) over a capturing sink with scripted stream events, then runs the
+captured telemetry through the same assembler `export-log` uses (`export::build_log`). It asserts a
+**populated** lifecycle log: 12 bundles, 10 landed (`submitted→processed→confirmed→finalized` with
+real slots + latencies), and 2 deliberately-injected, correctly-classified failures
+(`fee_too_low`, `expired_blockhash`). This regression-guards the wiring whose absence previously made
+the exported log come out empty.
+
+In the live run (Tier 5) the deterministic `decide_retry` policy is replaced by the AI agent's
+reasoned decision over the same signals — same loop, with a visible reasoning trace — and the proof
+driver injects the same faults against mainnet to produce the explorer-verifiable log.
 
 ## Methodology notes
 Develop + inject on testnet/devnet; the explorer-verifiable proof run is on mainnet. Each run is

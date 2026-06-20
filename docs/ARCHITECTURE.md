@@ -117,12 +117,21 @@ The engine is wired end-to-end and validated against the **live SolInfra mainnet
   `10.5k → 12.5k → 14.5k` lamports as congestion rose while the saga drove autonomous retries
   (refresh blockhash on expiry, re-price always) to a landing.
 - **Submit path.** `prometheon-core::proof` assembles a real bundle from live data (fresh blockhash,
-  rotating tip account, live-floor tip, congestion-scaled CU price), signs it, and either simulates
-  (free dry-run) or submits + stream-tracks the lifecycle. Dry-run validated on mainnet: a dynamic
+  rotating tip account, live-floor tip clamped to policy bounds, congestion-scaled CU price), signs
+  it, and either simulates (free dry-run) or submits it. Dry-run validated on mainnet: a dynamic
   3329-lamport tip, 4 rotating tip accounts, distinct blockhashes/signatures; the simulator returns
   `AccountNotFound`, i.e. assembled correctly — only funding gates broadcast.
+- **Submit → telemetry → export pipeline.** `prometheon-core::proof_run` drives all in-flight bundles
+  over **one shared** Yellowstone stream and emits `Bundle`/`Lifecycle`/`Failure` events through the
+  same `Sinks` (NATS + Postgres) the engine uses, so `export-log` reads what the run persists. The
+  full submit → stream-confirmed lifecycle → telemetry → `build_log` path is integration-tested
+  without a network in `prometheon-core/tests/proof_pipeline.rs` (asserts a populated log: 12 bundles,
+  10 landed `submitted→processed→confirmed→finalized`, 2 injected + classified failures). Fault
+  injection (`--inject low-tip,stale-blockhash`) guarantees the bounty's ≥2 failure cases.
 - **One contract.** Rust telemetry types (`schemars`) generate `contracts/json-schema/*` and the TS
-  types; CI fails on drift. The dashboard consumes the live NATS feed (mock auto-fallback).
+  types; CI fails on drift. The dashboard consumes the live NATS feed and labels its status honestly
+  (`source: live|mock` → "live"/"simulated"), never showing a live indicator over the mock feed.
 
-Remaining: the funded mainnet proof run (`scripts/run-proof.sh`) to produce the explorer-verifiable
-lifecycle log, and §19/§20 actuals + lessons from it.
+Remaining (Tier 5, gated on funding): the funded mainnet proof run (`scripts/run-proof.sh`) to
+produce the explorer-verifiable lifecycle log with real injected failures and a real AI reasoning
+trace, plus §19/§20 actuals + lessons from it.

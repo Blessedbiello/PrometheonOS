@@ -90,9 +90,10 @@ LLM_PROVIDER=mock pnpm --filter @prometheon/ai-agent start
 # 3. Dashboard — live ops console (auto-falls back to a mock feed when the bus is quiet).
 pnpm --filter @prometheon/dashboard dev          # http://localhost:3000
 
-# 4. Proof — build + simulate (free dry-run) or submit (live) N bundles on mainnet.
-NETWORK=mainnet cargo run -p prometheon-core --bin proof -- --count 12            # dry-run
-NETWORK=mainnet ./scripts/run-proof.sh 12                                         # live (needs funded wallet)
+# 4. Proof — assemble + simulate (free dry-run) or submit + stream-track (live) N bundles, with
+#    deterministic injected failures. The live run persists Bundle/Lifecycle/Failure telemetry.
+NETWORK=mainnet cargo run -p prometheon-core --bin proof -- --count 12                  # dry-run
+NETWORK=mainnet ./scripts/run-proof.sh 12 low-tip:1,stale-blockhash:1                   # live (funded wallet)
 
 # 5. Lifecycle log — export the persisted bundles to logs/lifecycle-log.{json,md}.
 cargo run -p prometheon-telemetry --bin export-log
@@ -106,17 +107,25 @@ Regenerate the cross-language contract after changing a Rust telemetry type:
 
 ## Status
 
-The full stack is built and **validated live against the SolInfra mainnet stream**: ingestion →
-network-health model → NATS / Postgres / Prometheus sinks → dashboard, plus the AI strategist
-(tip decision proven end-to-end over NATS) and the bundle submit path (dry-run validated on
-mainnet — dynamic tip from live floor, rotating tip accounts, fresh blockhash + signature; only
-broadcast needs funding). ~160 tests; CI runs fmt · clippy · tests · schema-drift · TS typecheck +
-tests.
+**Validated live (read-only spine).** Ingestion → network-health model → NATS / Postgres /
+Prometheus sinks → dashboard, against the SolInfra mainnet stream; plus the AI strategist (tip
+decision proven end-to-end over NATS).
 
-The one remaining step is the **mainnet proof run** (≥10 bundles incl. ≥2 failures), which needs a
-funded mainnet wallet. Fund `wallets/payer.mainnet.json` with ~$5–15 of SOL, then run
-`./scripts/run-proof.sh`. (It must be mainnet — Jito has no devnet Block Engine and the SolInfra
-stream is mainnet; the dry-run validates the same path for free in the meantime.)
+**Integration-tested (submit pipeline).** The submit → stream-confirmed lifecycle →
+`Bundle`/`Lifecycle`/`Failure` telemetry → Postgres → lifecycle-log export path is covered
+end-to-end, without a network, by `prometheon-core/tests/proof_pipeline.rs` (asserts a populated log:
+≥10 landed + ≥2 classified failures). The assembly path is additionally dry-run validated on mainnet
+(dynamic tip from live floor, rotating tip accounts, fresh blockhash + signature; only broadcast
+needs funding). ~165 Rust + 45 TS tests; CI runs fmt · clippy · tests · schema-drift · TS typecheck +
+tests · dependency audit.
+
+**Final gated step — the funded mainnet proof run.** `./scripts/run-proof.sh` opens **one**
+Yellowstone stream, submits ≥10 bundles **including ≥2 deterministically-injected failures**
+(`--inject low-tip:1,stale-blockhash:1`), stream-confirms each lifecycle, persists the telemetry, and
+exports `logs/lifecycle-log.{json,md}` with explorer-verifiable slots. It needs a funded mainnet
+wallet (~$5–15 SOL in `wallets/payer.mainnet.json`) and Postgres up. It must be mainnet — Jito has no
+devnet Block Engine and the SolInfra stream is mainnet; the dry-run validates the same assembly path
+for free in the meantime.
 
 ## README questions (answered from real telemetry)
 
