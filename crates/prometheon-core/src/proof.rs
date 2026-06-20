@@ -57,6 +57,13 @@ pub fn default_tip_strategy() -> TipStrategy {
     }
 }
 
+/// Bound a resolved tip to the policy's `[min, max]`. The AI strategist *proposes* the tip; the
+/// deterministic core *caps* it, so a malformed or manipulated decision can never make us overpay
+/// (or under-tip below the Jito minimum). Defense-in-depth against decision poisoning.
+pub fn bounded_tip(resolved_lamports: u64, strategy: &TipStrategy) -> u64 {
+    resolved_lamports.clamp(strategy.min_lamports, strategy.max_lamports)
+}
+
 /// A fully-assembled, signed attempt ready to simulate or submit.
 #[derive(Debug, Clone)]
 pub struct AttemptPlan {
@@ -73,6 +80,10 @@ pub struct AttemptPlan {
 }
 
 /// Assemble + sign one attempt against live data. No broadcast — caller chooses simulate vs submit.
+///
+/// `tip_override` forces a specific tip (used by fault injection to submit a deliberately sub-floor
+/// tip); `blockhash_override` substitutes a caller-supplied blockhash (used to submit on a
+/// deliberately stale/expired one). Both `None` for a normal attempt.
 #[allow(clippy::too_many_arguments)]
 pub async fn prepare_attempt(
     rpc: &RpcClient,
@@ -82,8 +93,13 @@ pub async fn prepare_attempt(
     decision: Option<Decision>,
     attempt: u32,
     transfer_lamports: u64,
+    tip_override: Option<u64>,
+    blockhash_override: Option<crate::rpc::BlockhashInfo>,
 ) -> anyhow::Result<AttemptPlan> {
-    let bh = rpc.latest_blockhash().await?;
+    let bh = match blockhash_override {
+        Some(b) => b,
+        None => rpc.latest_blockhash().await?,
+    };
     let tip_accounts = jito.get_tip_accounts().await?;
     let tip_account = tip_accounts
         .pick(attempt as u64)
@@ -91,8 +107,14 @@ pub async fn prepare_attempt(
         .to_string();
     let floor = jito.get_tip_floor().await?;
 
-    let fallback = compute_tip(&floor, &default_tip_strategy(), congestion);
-    let tip_lamports = resolve_tip(decision.as_ref(), fallback.lamports);
+    let strategy = default_tip_strategy();
+    let fallback = compute_tip(&floor, &strategy, congestion);
+    // Resolve the tip (injection override → AI decision → live-data fallback), then clamp it to the
+    // policy bounds so a malformed/poisoned decision can never make us overpay or under-tip below the
+    // Jito minimum.
+    let resolved =
+        tip_override.unwrap_or_else(|| resolve_tip(decision.as_ref(), fallback.lamports));
+    let tip_lamports = bounded_tip(resolved, &strategy);
     let cu_price_micro = priority_cu_price_micro(congestion);
 
     let params = BundleParams {
@@ -266,6 +288,14 @@ mod tests {
         assert_eq!(priority_cu_price_micro(1.0), 5_000);
         assert_eq!(priority_cu_price_micro(0.5), 2_750);
         assert_eq!(priority_cu_price_micro(2.0), 5_000); // clamped
+    }
+
+    #[test]
+    fn ai_tip_is_clamped_to_policy_bounds() {
+        let s = default_tip_strategy(); // min 1_000, max 1_000_000
+        assert_eq!(bounded_tip(50, &s), 1_000); // absurdly low → floored at Jito minimum
+        assert_eq!(bounded_tip(5_000_000, &s), 1_000_000); // absurdly high → capped
+        assert_eq!(bounded_tip(14_500, &s), 14_500); // within range → untouched
     }
 
     #[test]

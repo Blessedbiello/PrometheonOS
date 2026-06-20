@@ -23,6 +23,7 @@ use prometheon_telemetry::{PostgresSink, TelemetryBus, TelemetryEvent};
 
 use crate::config::Config;
 use crate::metrics::{self, EngineCounters, MetricsState};
+use crate::sinks::{EventSink, Sinks};
 
 const LATENCY_WINDOW: usize = 256;
 const HEALTH_INTERVAL: Duration = Duration::from_secs(2);
@@ -61,27 +62,12 @@ fn tip_floor_client(config: &Config) -> Option<BlockEngineClient> {
     .ok()
 }
 
-/// The sinks a telemetry event fans out to: NATS (always) and Postgres (when configured). One
-/// `emit` call site keeps every event both published and persisted, and bumps the event counter.
-struct Sinks {
-    bus: TelemetryBus,
-    pg: Option<PostgresSink>,
-}
-
-impl Sinks {
-    /// Publish to NATS and persist to Postgres — both best-effort: telemetry must never block or
-    /// crash the engine, so failures are logged and swallowed.
-    async fn emit(&self, event: &TelemetryEvent, counters: &mut EngineCounters) {
-        counters.telemetry_events_total += 1;
-        if let Err(e) = self.bus.publish(event).await {
-            tracing::debug!(error = %e, subject = event.subject(), "nats publish failed");
-        }
-        if let Some(pg) = &self.pg {
-            if let Err(e) = pg.record(event).await {
-                tracing::debug!(error = %e, "postgres record failed");
-            }
-        }
-    }
+/// Emit a telemetry event through the shared [`Sinks`] and bump the engine's event counter. The
+/// sink itself is best-effort (NATS + Postgres failures are logged and swallowed); this wrapper just
+/// keeps the engine's counter in lock-step with the emit call site.
+async fn emit(sinks: &Sinks, event: &TelemetryEvent, counters: &mut EngineCounters) {
+    counters.telemetry_events_total += 1;
+    sinks.emit(event).await;
 }
 
 /// Run the telemetry pipeline until the ingest stream closes.
@@ -116,7 +102,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
     } else {
         None
     };
-    let sinks = Sinks { bus, pg };
+    let sinks = Sinks::new(bus, pg);
 
     // Prometheus /metrics exporter (best-effort; engine continues if the address is unusable).
     let metrics = MetricsState::default();
@@ -172,7 +158,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                     "health snapshot"
                 );
                 metrics.set_health(snap.clone()).await;
-                sinks.emit(&TelemetryEvent::Health(snap), &mut counters).await;
+                emit(&sinks, &TelemetryEvent::Health(snap), &mut counters).await;
                 counters.stream_reconnects_total = handle.counters.snapshot().2;
                 metrics.set_counters(counters.clone()).await;
             },
@@ -205,7 +191,7 @@ async fn handle_message(
         } => {
             apply_slot_observation(model, &observation);
             counters.slots_total += 1;
-            sinks.emit(&TelemetryEvent::Slot(update), counters).await;
+            emit(sinks, &TelemetryEvent::Slot(update), counters).await;
         }
         IngestMessage::Transaction(_tx) => {
             // Stream-confirmed lifecycle correlation lands with the live submit driver (Phase 8).

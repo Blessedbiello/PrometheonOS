@@ -46,17 +46,26 @@ impl LifecycleStage {
     }
 
     /// Whether `to` is a legal next stage from `self`.
+    ///
+    /// Forward-skips are allowed (`Submitted → Confirmed`, `Processed → Finalized`) because the
+    /// stream can deliver a later commitment status without our having observed the intermediate one
+    /// (e.g. a dropped `confirmed` slot-status): we should still advance rather than strand the
+    /// bundle. Backward and otherwise-illegal transitions remain rejected.
     pub fn can_transition_to(self, to: LifecycleStage) -> bool {
         use LifecycleStage::*;
         matches!(
             (self, to),
             (Submitted, Processed)
+                | (Submitted, Confirmed)
+                | (Submitted, Finalized)
                 | (Submitted, Failed)
                 | (Submitted, Expired)
                 | (Submitted, Dropped)
                 | (Processed, Confirmed)
+                | (Processed, Finalized)
                 | (Processed, Failed)
                 | (Confirmed, Finalized)
+                | (Confirmed, Failed)
         )
     }
 }
@@ -140,6 +149,15 @@ impl TransactionLifecycle {
     /// Whether the lifecycle ended in success (finalized).
     pub fn is_success(&self) -> bool {
         self.current == LifecycleStage::Finalized
+    }
+
+    /// Whether the bundle reached at least `confirmed` — the bar for a stream-confirmed landing
+    /// (a `processed`-only bundle is in a block but fork-revertible, so it does not yet count).
+    pub fn reached_confirmed(&self) -> bool {
+        matches!(
+            self.current,
+            LifecycleStage::Confirmed | LifecycleStage::Finalized
+        )
     }
 
     /// Attempt to advance to `to` at slot/time `ts`. See [`TransitionOutcome`].

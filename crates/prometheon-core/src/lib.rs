@@ -8,9 +8,12 @@ pub mod engine;
 pub mod leader;
 pub mod metrics;
 pub mod proof;
+pub mod proof_run;
 pub mod rpc;
+pub mod sinks;
 pub mod submission;
 pub mod wallet;
 
 pub use config::{Config, Network};
+pub use sinks::{EventSink, Sinks};
 pub use submission::{next_saga_action, SagaAction, SubmissionOutcome};

@@ -61,16 +61,40 @@ fn happy_path_records_stages_slots_and_latency_deltas() {
 #[test]
 fn illegal_transition_is_rejected_without_mutating() {
     let mut lc = TransactionLifecycle::new("bundle1", at(0, 0));
-    // Submitted cannot jump straight to Finalized.
+    lc.advance(LifecycleStage::Confirmed, Some(100), at(1, 0));
+    // A backward transition (Confirmed → Processed) is never legal.
     assert_eq!(
-        lc.advance(LifecycleStage::Finalized, Some(100), at(1, 0)),
+        lc.advance(LifecycleStage::Processed, Some(100), at(2, 0)),
         TransitionOutcome::Illegal {
-            from: LifecycleStage::Submitted,
-            to: LifecycleStage::Finalized,
+            from: LifecycleStage::Confirmed,
+            to: LifecycleStage::Processed,
         }
     );
-    assert_eq!(lc.current_stage(), LifecycleStage::Submitted);
-    assert_eq!(lc.events().len(), 1); // only the initial Submitted event
+    assert_eq!(lc.current_stage(), LifecycleStage::Confirmed);
+    assert_eq!(lc.events().len(), 2); // Submitted + Confirmed only
+}
+
+#[test]
+fn forward_skips_are_allowed_when_an_intermediate_status_is_missed() {
+    // The stream can deliver a later commitment without the intermediate one (e.g. a dropped
+    // `confirmed` slot-status). We advance rather than strand the bundle.
+    let mut lc = TransactionLifecycle::new("bundle1", at(0, 0));
+    lc.advance(LifecycleStage::Processed, Some(100), at(0, 500));
+    assert_eq!(
+        lc.advance(LifecycleStage::Finalized, Some(100), at(13, 0)),
+        TransitionOutcome::Advanced
+    );
+    assert_eq!(lc.current_stage(), LifecycleStage::Finalized);
+    assert!(lc.is_success());
+    assert!(lc.reached_confirmed());
+
+    // Submitted can also jump straight to Confirmed if Processed was never seen.
+    let mut lc2 = TransactionLifecycle::new("bundle2", at(0, 0));
+    assert_eq!(
+        lc2.advance(LifecycleStage::Confirmed, Some(101), at(1, 0)),
+        TransitionOutcome::Advanced
+    );
+    assert!(lc2.reached_confirmed());
 }
 
 #[test]
