@@ -16,6 +16,7 @@ describe("MockState", () => {
     for (let i = 0; i < 100; i++) s.tick();
     const snap = s.tick();
     expect(snap.current_slot).toBeGreaterThan(298_430_000);
+    expect(snap.source).toBe("mock"); // the UI must render this as "simulated", never "live"
     expect(snap.network).toBe("mock");
     expect(snap.health.congestion_score).toBeGreaterThanOrEqual(0);
     expect(snap.health.congestion_score).toBeLessThanOrEqual(1);

@@ -9,7 +9,7 @@ export class AnthropicProvider implements LlmProvider {
   private client: Anthropic;
   private model: string;
 
-  constructor(apiKey: string, model = "claude-opus-4-7") {
+  constructor(apiKey: string, model = "claude-opus-4-8") {
     this.client = new Anthropic({ apiKey });
     this.model = model;
   }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bundles } from "@/components/Bundles";
 import { Decisions } from "@/components/Decisions";
-import { Header } from "@/components/Header";
+import { Header, type FeedState } from "@/components/Header";
 import { NetworkHealth } from "@/components/NetworkHealth";
 import { SlotStream } from "@/components/SlotStream";
 import type { DashboardSnapshot } from "@/lib/types";
@@ -12,7 +12,9 @@ const POLL_MS = 1_000;
 
 export default function Page() {
   const [snap, setSnap] = useState<DashboardSnapshot | null>(null);
-  const [live, setLive] = useState(false);
+  // The status indicator reflects the DATA SOURCE, not merely whether the fetch succeeded — a
+  // successful fetch of the mock feed must read "simulated", never "live".
+  const [feed, setFeed] = useState<FeedState>("off");
 
   useEffect(() => {
     let cancelled = false;
@@ -25,10 +27,10 @@ export default function Page() {
         const data = (await res.json()) as DashboardSnapshot;
         if (!cancelled) {
           setSnap(data);
-          setLive(true);
+          setFeed(data.source === "live" ? "live" : "simulated");
         }
       } catch {
-        if (!cancelled) setLive(false);
+        if (!cancelled) setFeed("off");
       } finally {
         if (!cancelled) timer = setTimeout(poll, POLL_MS);
       }
@@ -46,7 +48,7 @@ export default function Page() {
         network={snap?.network ?? "—"}
         slot={snap?.current_slot ?? 0}
         provider={snap?.ai_provider ?? "—"}
-        live={live}
+        feed={feed}
       />
 
       <div className="grid grid-cols-12 gap-4 p-4">

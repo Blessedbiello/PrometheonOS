@@ -8,6 +8,11 @@ function clock(start = 1_000): { now: () => number; set: (t: number) => void } {
 }
 
 describe("LiveTelemetry reducer", () => {
+  it("tags its snapshot as a live source (never simulated)", () => {
+    const live = new LiveTelemetry();
+    expect(live.snapshot().source).toBe("live");
+  });
+
   it("folds slot events into a bounded, current-slot-tracking window", () => {
     const live = new LiveTelemetry();
     for (let i = 0; i < 25; i++) {

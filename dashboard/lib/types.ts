@@ -101,6 +101,9 @@ export interface HealthSnapshot {
 
 export interface DashboardSnapshot {
   ts: string;
+  /** Whether this snapshot is real engine telemetry or the offline mock simulation. The UI must
+   *  surface this honestly — never show a "live" indicator over simulated data. */
+  source: "live" | "mock";
   network: "testnet" | "mainnet" | "mock";
   current_slot: number;
   next_jito_leader_in_slots: number | null;

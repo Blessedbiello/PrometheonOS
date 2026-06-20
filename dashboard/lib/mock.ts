@@ -216,6 +216,7 @@ export class MockState {
       .findIndex((s) => s.jito);
     return {
       ts: this.ts(),
+      source: "mock",
       network: "mock",
       current_slot: this.slot,
       next_jito_leader_in_slots: nextJito >= 0 ? nextJito : null,

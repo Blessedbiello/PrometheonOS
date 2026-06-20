@@ -19,8 +19,10 @@ export async function GET() {
     const connected = await ensureConnected(NATS_URL).catch(() => false);
     const live = liveTelemetry();
     if (connected && (SOURCE === "live" || live.hasData())) {
+      // `live.snapshot()` carries `source: "live"`.
       return NextResponse.json(live.snapshot(), { headers: { "cache-control": "no-store" } });
     }
   }
+  // `mock.tick()` carries `source: "mock"` — the UI renders this as "simulated", never "live".
   return NextResponse.json(mock.tick(), { headers: { "cache-control": "no-store" } });
 }

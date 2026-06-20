@@ -175,6 +175,7 @@ export class LiveTelemetry {
   snapshot(): DashboardSnapshot {
     return {
       ts: new Date(this.now()).toISOString(),
+      source: "live",
       network: this.network,
       current_slot: this.currentSlot,
       next_jito_leader_in_slots: null,
