@@ -80,6 +80,9 @@ async fn proof_run_emits_a_populated_lifecycle_log_with_failures() {
             submitted_at: ts(0),
             tip_floor_p50_lamports: floor,
             injected: None,
+            base_id: format!("bundle-{i}"),
+            attempt_no: 1,
+            deadline_slot: None,
         });
     }
     submitted.push(SubmittedBundle {
@@ -93,6 +96,9 @@ async fn proof_run_emits_a_populated_lifecycle_log_with_failures() {
         injected: Some(FaultScenario::LowTip {
             tip_lamports: 1_000,
         }),
+        base_id: "bundle-10".into(),
+        attempt_no: 1,
+        deadline_slot: None,
     });
     submitted.push(SubmittedBundle {
         bundle_id: "bundle-11".into(),
@@ -103,6 +109,9 @@ async fn proof_run_emits_a_populated_lifecycle_log_with_failures() {
         submitted_at: ts(0),
         tip_floor_p50_lamports: floor,
         injected: Some(FaultScenario::BlockhashExpiry),
+        base_id: "bundle-11".into(),
+        attempt_no: 1,
+        deadline_slot: None,
     });
 
     // Script the stream: each landing bundle's signature lands in a distinct slot which then reaches

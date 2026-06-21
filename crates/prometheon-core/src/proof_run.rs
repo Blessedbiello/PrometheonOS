@@ -37,6 +37,14 @@ pub struct SubmittedBundle {
     pub tip_floor_p50_lamports: u64,
     /// Set when this attempt was a deliberately injected fault; drives the failure classification.
     pub injected: Option<FaultScenario>,
+    /// The logical bundle this attempt belongs to (retries share a `base_id`).
+    pub base_id: String,
+    /// 1-indexed attempt number for this `base_id`.
+    pub attempt_no: u32,
+    /// Observed-slot watermark past which the saga gives up on this attempt and treats it as failed
+    /// (the give-up signal that drives autonomous retry). `None` → only fails via a failed tx-status
+    /// or the global deadline.
+    pub deadline_slot: Option<u64>,
 }
 
 /// Outcome counts for a proof run.
@@ -211,6 +219,9 @@ mod tests {
             submitted_at: DateTime::from_timestamp(1_700_000_000, 0).unwrap(),
             tip_floor_p50_lamports: 20_000,
             injected,
+            base_id: "b".into(),
+            attempt_no: 1,
+            deadline_slot: None,
         }
     }
 

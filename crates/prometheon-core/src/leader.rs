@@ -43,6 +43,51 @@ impl LeaderWindow {
     }
 }
 
+/// The upcoming leader schedule from Solana RPC `getSlotLeaders`: `leaders[i]` is the validator
+/// identity for `start_slot + i`.
+///
+/// This is the **reliable, no-auth** way to detect leader windows for submission timing. The Jito
+/// searcher `getNextScheduledLeader` (which would also tell us *which* upcoming leaders run Jito) is
+/// a gRPC searcher-API method needing approved auth — its HTTP form 404s — so we time against the
+/// RPC schedule and rely on the Block Engine routing the bundle to the next Jito leader. The math is
+/// pure and unit-tested; the AI submission-timing decision reasons over it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeaderSchedule {
+    pub start_slot: u64,
+    pub leaders: Vec<String>,
+}
+
+impl LeaderSchedule {
+    pub fn new(start_slot: u64, leaders: Vec<String>) -> Self {
+        Self {
+            start_slot,
+            leaders,
+        }
+    }
+
+    /// The leader producing `start_slot` (the current leader), if known.
+    pub fn current_leader(&self) -> Option<&str> {
+        self.leaders.first().map(|s| s.as_str())
+    }
+
+    /// Slots from `start_slot` until the leader identity changes (a fresh window begins). `None` if
+    /// the whole observed schedule has a single leader. Submitting just after a change maximizes
+    /// runway in the new window; right before one risks landing in the tail of a slot.
+    pub fn slots_until_leader_change(&self) -> Option<u64> {
+        let first = self.leaders.first()?;
+        self.leaders
+            .iter()
+            .position(|l| l != first)
+            .map(|i| i as u64)
+    }
+
+    /// The next slot at which the leader changes, if observed within the schedule.
+    pub fn next_leader_change_slot(&self) -> Option<u64> {
+        self.slots_until_leader_change()
+            .map(|d| self.start_slot + d)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,5 +123,34 @@ mod tests {
         let w = LeaderWindow::new(600, 500);
         assert_eq!(w.slots_until(), 0);
         assert!(w.in_window(0));
+    }
+
+    #[test]
+    fn leader_schedule_finds_the_next_rotation() {
+        // Same leader for 4 slots, then it changes at index 4.
+        let s = LeaderSchedule::new(
+            1_000,
+            vec![
+                "Val1".into(),
+                "Val1".into(),
+                "Val1".into(),
+                "Val1".into(),
+                "Val2".into(),
+                "Val2".into(),
+            ],
+        );
+        assert_eq!(s.current_leader(), Some("Val1"));
+        assert_eq!(s.slots_until_leader_change(), Some(4));
+        assert_eq!(s.next_leader_change_slot(), Some(1_004));
+    }
+
+    #[test]
+    fn leader_schedule_with_one_leader_reports_no_change() {
+        let s = LeaderSchedule::new(50, vec!["Solo".into(); 8]);
+        assert_eq!(s.slots_until_leader_change(), None);
+        assert_eq!(s.next_leader_change_slot(), None);
+        let empty = LeaderSchedule::new(0, vec![]);
+        assert_eq!(empty.current_leader(), None);
+        assert_eq!(empty.slots_until_leader_change(), None);
     }
 }

@@ -21,18 +21,21 @@ use std::time::Duration;
 use prometheon_bundle::{BlockEngineClient, BlockEngineConfig, Percentile, TipFloor};
 use prometheon_core::{
     config::Config,
-    leader::LeaderWindow,
+    leader::{LeaderSchedule, LeaderWindow},
     proof,
     proof_run::{self, SubmittedBundle},
     rpc::{BlockhashInfo, RpcClient},
-    sinks::Sinks,
+    saga::{run_saga, AttemptSpec, BaseBundle, DecisionSource, SagaConfig, Submitter},
+    sinks::{EventSink, Sinks},
     wallet,
 };
 use prometheon_faultinject::FaultScenario;
 use prometheon_ingest::yellowstone::{self, SubscriptionSpec, YellowstoneConfig};
-use prometheon_telemetry::{PostgresSink, TelemetryBus};
+use prometheon_telemetry::{Decision, DecisionType, PostgresSink, TelemetryBus, TelemetryEvent};
 use prometheon_types::Commitment;
+use serde_json::{json, Value};
 use solana_sdk::signer::Signer;
+use tokio::sync::Mutex;
 
 fn arg_u64(args: &[String], flag: &str, default: u64) -> u64 {
     args.iter()
@@ -203,9 +206,9 @@ async fn main() -> anyhow::Result<()> {
     if live {
         run_live(
             &config,
-            &rpc,
-            &jito,
-            &payer,
+            rpc.clone(),
+            jito.clone(),
+            payer,
             congestion,
             transfer,
             floor_p50,
@@ -279,14 +282,124 @@ async fn run_dry(
     Ok(())
 }
 
-/// Live: open one shared stream, submit every bundle (incl. injected failures), then track them all
-/// to terminal/timeout while emitting telemetry to NATS + Postgres for the lifecycle-log export.
+/// Live AI decision source: ask the TS agent over NATS; `None` on timeout/error so the saga falls
+/// back to the deterministic policy (and still emits a visible decision trace).
+struct LiveDecisionSource {
+    bus: TelemetryBus,
+    timeout: Duration,
+}
+
+impl DecisionSource for LiveDecisionSource {
+    async fn decide(&self, decision_type: DecisionType, context: Value) -> Option<Decision> {
+        match self
+            .bus
+            .request_decision(decision_type, context, self.timeout)
+            .await
+        {
+            Ok(d) => Some(d),
+            Err(e) => {
+                tracing::debug!(error = %e, "decision request failed; policy fallback");
+                None
+            }
+        }
+    }
+}
+
+/// Live submitter: assemble (with injection / refresh), sign, and `sendBundle`, returning a tracked
+/// attempt. Sets a real-slot give-up watermark so the saga retries deterministically.
+struct LiveSubmitter {
+    rpc: RpcClient,
+    jito: BlockEngineClient,
+    payer: solana_sdk::signature::Keypair,
+    congestion: f64,
+    transfer: u64,
+    region: String,
+    /// Tip-floor median at run start — lets the classifier infer `fee_too_low` on a low-tip non-land.
+    floor_p50: u64,
+    /// Captured-then-expired blockhash reused for stale-blockhash injection (fetched once).
+    stale: Mutex<Option<BlockhashInfo>>,
+}
+
+impl LiveSubmitter {
+    /// Fetch a blockhash once, wait until it has expired, and cache it for injection reuse.
+    async fn stale_blockhash(&self) -> anyhow::Result<BlockhashInfo> {
+        let mut guard = self.stale.lock().await;
+        if guard.is_none() {
+            let bh = self.rpc.latest_blockhash().await?;
+            eprintln!("   …waiting for blockhash to expire (guarantees a non-landing)…");
+            wait_until_expired(&self.rpc, &bh).await;
+            *guard = Some(bh);
+        }
+        Ok(guard.clone().expect("just set"))
+    }
+}
+
+impl Submitter for LiveSubmitter {
+    async fn submit(&self, spec: &AttemptSpec) -> anyhow::Result<SubmittedBundle> {
+        let current_slot = self.rpc.get_slot().await.unwrap_or(0);
+        // tip override + stale blockhash + give-up watermark (slots) by injection type.
+        let (tip_override, bh_override, give_up_after) = match spec.injected {
+            Some(FaultScenario::LowTip { tip_lamports }) => (Some(tip_lamports), None, 64),
+            Some(FaultScenario::BlockhashExpiry) => (None, Some(self.stale_blockhash().await?), 2),
+            _ => (spec.tip_lamports, None, 150),
+        };
+        let plan = proof::prepare_attempt(
+            &self.rpc,
+            &self.jito,
+            &self.payer,
+            self.congestion,
+            None,
+            spec.attempt_no,
+            self.transfer,
+            tip_override,
+            bh_override,
+        )
+        .await?;
+        let bundle_id = match self
+            .jito
+            .send_bundle(std::slice::from_ref(&plan.tx_base64))
+            .await
+        {
+            Ok(id) => id,
+            Err(e) => {
+                eprintln!("   send rejected ({e}); tracking by signature");
+                plan.signature.clone()
+            }
+        };
+        println!(
+            "  {} a{}  tip={:>7}  bh={}  sig={}{}",
+            spec.base_id,
+            spec.attempt_no,
+            plan.tip_lamports,
+            short(&plan.blockhash),
+            short(&plan.signature),
+            inject_label(spec.injected),
+        );
+        Ok(SubmittedBundle {
+            bundle_id,
+            signature: plan.signature.clone(),
+            tip_lamports: plan.tip_lamports,
+            tip_account: plan.tip_account.clone(),
+            region: self.region.clone(),
+            submitted_at: chrono::Utc::now(),
+            tip_floor_p50_lamports: self.floor_p50,
+            injected: spec.injected,
+            base_id: spec.base_id.clone(),
+            attempt_no: spec.attempt_no,
+            deadline_slot: Some(current_slot.saturating_add(give_up_after)),
+        })
+    }
+}
+
+/// Live: open one shared stream and run the AI-driven saga — the agent makes a tip decision per
+/// bundle and a retry decision on each failure (refresh + re-price + resubmit), emitting
+/// Bundle/Lifecycle/Failure/Decision telemetry to NATS + Postgres for the lifecycle-log export.
 #[allow(clippy::too_many_arguments)]
 async fn run_live(
     config: &Config,
-    rpc: &RpcClient,
-    jito: &BlockEngineClient,
-    payer: &solana_sdk::signature::Keypair,
+    rpc: RpcClient,
+    jito: BlockEngineClient,
+    payer: solana_sdk::signature::Keypair,
     congestion: f64,
     transfer: u64,
     floor_p50: u64,
@@ -308,6 +421,10 @@ async fn run_live(
         );
         None
     };
+    let decider = LiveDecisionSource {
+        bus: bus.clone(),
+        timeout: Duration::from_secs(8),
+    };
     let sinks = Sinks::new(bus, pg);
 
     // ONE Yellowstone stream for the whole run (open before submitting so we miss no early events).
@@ -315,6 +432,7 @@ async fn run_live(
         .yellowstone_endpoint
         .clone()
         .ok_or_else(|| anyhow::anyhow!("YELLOWSTONE_ENDPOINT required for live tracking"))?;
+    let payer_pubkey = payer.pubkey().to_string();
     let yc = YellowstoneConfig {
         endpoint,
         x_token: config.yellowstone_x_token.clone(),
@@ -324,93 +442,69 @@ async fn run_live(
     };
     let spec = SubscriptionSpec {
         track_slots: true,
-        tx_account_include: vec![payer.pubkey().to_string()],
+        tx_account_include: vec![payer_pubkey],
         ..Default::default()
     };
     let mut handle = yellowstone::spawn(yc, spec);
 
-    let region = proof_run::region_from_url(&config.jito_block_engine_url);
-
-    // Capture a blockhash once for any stale-blockhash injection.
-    let needs_expiry = injections
-        .iter()
-        .any(|i| matches!(i, Some(FaultScenario::BlockhashExpiry)));
-    let expiry_source = if needs_expiry {
-        Some(rpc.latest_blockhash().await?)
-    } else {
-        None
-    };
-
-    let mut submitted = Vec::new();
-    for (i, inj) in injections.iter().enumerate() {
-        let attempt = (i + 1) as u32;
-        let (tip_override, bh_override) = match inj {
-            Some(FaultScenario::LowTip { tip_lamports }) => (Some(*tip_lamports), None),
-            Some(FaultScenario::BlockhashExpiry) => {
-                let src = expiry_source.clone().expect("captured when needs_expiry");
-                println!("   …waiting for blockhash to expire (guarantees a non-landing)…");
-                wait_until_expired(rpc, &src).await;
-                (None, Some(src))
-            }
-            _ => (None, None),
-        };
-
-        let plan = proof::prepare_attempt(
-            rpc,
-            jito,
-            payer,
-            congestion,
-            None,
-            attempt,
-            transfer,
-            tip_override,
-            bh_override,
-        )
-        .await?;
+    // Real leader-window detection via RPC `getSlotLeaders` → a visible AI submission-timing decision
+    // (best-effort; the proof still submits — Jito routes the bundle to the next Jito leader).
+    let current_slot = rpc.get_slot().await.unwrap_or(0);
+    let leaders = rpc
+        .get_slot_leaders(current_slot, 16)
+        .await
+        .unwrap_or_default();
+    let schedule = LeaderSchedule::new(current_slot, leaders);
+    let timing_ctx = json!({
+        "currentSlot": current_slot,
+        "currentLeader": schedule.current_leader(),
+        "slotsUntilLeaderChange": schedule.slots_until_leader_change(),
+        "congestionScore": congestion,
+    });
+    if let Some(d) = decider.decide(DecisionType::Timing, timing_ctx).await {
         println!(
-            "#{:<2} tip={:>7} lamports  cu_price={:<5}  acct={}  bh={}  sig={}{}",
-            attempt,
-            plan.tip_lamports,
-            plan.cu_price_micro,
-            short(&plan.tip_account),
-            short(&plan.blockhash),
-            short(&plan.signature),
-            inject_label(*inj),
+            "leader window: current_leader={} next_change_in={:?} → timing: {} ({})",
+            schedule.current_leader().unwrap_or("?"),
+            schedule.slots_until_leader_change(),
+            d.action,
+            d.reasoning,
         );
-
-        // Send; an expired/invalid bundle may be rejected outright — still track it (by signature)
-        // so it appears in the log as a classified failure.
-        let bundle_id = match jito
-            .send_bundle(std::slice::from_ref(&plan.tx_base64))
-            .await
-        {
-            Ok(id) => id,
-            Err(e) => {
-                println!("   send rejected ({e}); tracking as failure");
-                plan.signature.clone()
-            }
-        };
-
-        submitted.push(SubmittedBundle {
-            bundle_id,
-            signature: plan.signature.clone(),
-            tip_lamports: plan.tip_lamports,
-            tip_account: plan.tip_account.clone(),
-            region: region.clone(),
-            submitted_at: chrono::Utc::now(),
-            tip_floor_p50_lamports: floor_p50,
-            injected: *inj,
-        });
+        sinks.emit(&TelemetryEvent::Decision(d)).await;
     }
 
-    // Track every bundle on the shared stream until terminal or the blockhash window closes.
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
-    let summary = proof_run::track_and_emit(&sinks, submitted, &mut handle.rx, deadline).await;
+    let submitter = LiveSubmitter {
+        rpc,
+        jito,
+        payer,
+        congestion,
+        transfer,
+        region: proof_run::region_from_url(&config.jito_block_engine_url),
+        floor_p50,
+        stale: Mutex::new(None),
+    };
+
+    // One logical bundle per attempt slot; injected faults sit on the LAST attempts (set up earlier).
+    let base_ctx = json!({ "congestionScore": congestion, "tipFloorP50Lamports": floor_p50 });
+    let bases: Vec<BaseBundle> = injections
+        .iter()
+        .enumerate()
+        .map(|(i, inj)| BaseBundle {
+            base_id: format!("b{:02}", i + 1),
+            injected: *inj,
+            tip_context: base_ctx.clone(),
+        })
+        .collect();
+
+    let cfg = SagaConfig {
+        max_attempts: 3,
+        global_deadline: tokio::time::Instant::now() + Duration::from_secs(180),
+    };
+    let summary = run_saga(&sinks, &decider, &submitter, bases, &mut handle.rx, cfg).await;
     handle.task.abort();
     let _ = sinks.bus.flush().await;
 
     println!(
-        "\nsummary: {} landed, {} failed, of {} attempts (telemetry persisted; run export-log)",
+        "\nsummary: {} landed, {} failed, of {} submissions (telemetry persisted; run export-log)",
         summary.landed, summary.failed, summary.total
     );
     Ok(())

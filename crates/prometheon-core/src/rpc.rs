@@ -27,6 +27,7 @@ impl BlockhashInfo {
 }
 
 /// A thin JSON-RPC client over one endpoint.
+#[derive(Clone)]
 pub struct RpcClient {
     http: reqwest::Client,
     url: String,
@@ -67,6 +68,28 @@ impl RpcClient {
             .call("getBlockHeight", json!([{ "commitment": "confirmed" }]))
             .await?;
         parse_block_height(&v)
+    }
+
+    /// `getSlot` at `confirmed` — the current slot, on the same scale as the Yellowstone slot stream
+    /// (used to set per-attempt give-up watermarks for the saga).
+    pub async fn get_slot(&self) -> anyhow::Result<u64> {
+        let v = self
+            .call("getSlot", json!([{ "commitment": "confirmed" }]))
+            .await?;
+        parse_block_height(&v) // identical shape: result is a bare u64
+    }
+
+    /// `getSlotLeaders(start, limit)` → upcoming leader identities (base58), one per slot — the
+    /// real leader schedule used for submission-timing/leader-window detection.
+    pub async fn get_slot_leaders(
+        &self,
+        start_slot: u64,
+        limit: u64,
+    ) -> anyhow::Result<Vec<String>> {
+        let v = self
+            .call("getSlotLeaders", json!([start_slot, limit]))
+            .await?;
+        parse_slot_leaders(&v)
     }
 
     /// `isBlockhashValid` — decides rebroadcast (still valid) vs. rebuild (expired).
@@ -156,6 +179,17 @@ pub fn parse_block_height(v: &Value) -> anyhow::Result<u64> {
         .ok_or_else(|| anyhow::anyhow!("getBlockHeight: result not a u64"))
 }
 
+/// Parse a `getSlotLeaders` response (`result` is a flat array of base58 identities).
+pub fn parse_slot_leaders(v: &Value) -> anyhow::Result<Vec<String>> {
+    let arr = result(v, "getSlotLeaders")?
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("getSlotLeaders: result not an array"))?;
+    Ok(arr
+        .iter()
+        .filter_map(|x| x.as_str().map(String::from))
+        .collect())
+}
+
 /// Parse an `isBlockhashValid` response (`result.value` is the boolean).
 pub fn parse_is_blockhash_valid(v: &Value) -> anyhow::Result<bool> {
     result(v, "isBlockhashValid")?["value"]
@@ -223,6 +257,16 @@ mod tests {
     fn parses_block_height() {
         let v = json!({ "jsonrpc": "2.0", "id": 1, "result": 396_822_851u64 });
         assert_eq!(parse_block_height(&v).unwrap(), 396_822_851);
+    }
+
+    #[test]
+    fn parses_slot_leaders() {
+        let v = json!({ "jsonrpc": "2.0", "id": 1, "result": ["Val1", "Val1", "Val2"] });
+        let leaders = parse_slot_leaders(&v).unwrap();
+        assert_eq!(leaders, vec!["Val1", "Val1", "Val2"]);
+        // RPC error → Err, not a panic.
+        let err = json!({ "error": { "code": -32602, "message": "bad range" } });
+        assert!(parse_slot_leaders(&err).is_err());
     }
 
     #[test]
