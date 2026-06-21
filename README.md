@@ -12,19 +12,40 @@ professional Solana infrastructure team — not a transaction sender with an LLM
 
 ---
 
+## The AI decision it owns — Autonomous Retry with Fault Injection
+
+The agent owns the **retry decision** end-to-end inside the live run. We deliberately inject a
+blockhash-expiry (and a sub-floor tip); when a bundle doesn't land, the deterministic core
+**classifies** the failure and asks the agent — over NATS — *whether and how to recover*. The agent
+reasons (refresh the blockhash? re-price the tip, and to what?), the core enforces safety invariants
+(an expiry **always** forces a refresh; the tip is clamped to policy bounds), and it **resubmits the
+next attempt** — which lands. The agent also sets the **tip** per bundle and makes a
+**submission-timing** call from the live leader schedule. Every decision is persisted with its full
+`{inputs, reasoning, confidence, action, before/after}` trace, renders on the live dashboard timeline,
+and is exported into the lifecycle log. This is a real reasoned decision in the loop — not sequential
+automation. The deterministic policy (`prometheon-retry`) is the safety fallback when the agent is
+unavailable; the saga + recovery are regression-tested end-to-end without a network in
+[`crates/prometheon-core/tests/saga_pipeline.rs`](crates/prometheon-core/tests/saga_pipeline.rs).
+
 ## Why this is different
 
+- **AI genuinely in the loop** — the agent makes tip, timing, and autonomous-retry decisions *during*
+  the run; the recovered failure shows attempt 1 (classified failure) → attempt 2 (landed) in the log.
 - **Network Health Model** — a live network-condition intelligence layer (congestion, slot
   stability, leader reliability, confirmation-latency variance, bundle landing probability,
   expiry risk) that the AI consumes.
 - **Stream-confirmed lifecycle** — landing is confirmed from the **Yellowstone gRPC stream**
   (slot status + tx-status), with RPC only as a cross-check.
 - **Dynamic tips, no hardcoding** — tips are computed from live Jito tip-floor percentiles +
-  current network conditions.
+  current network conditions, then clamped to policy bounds (defense-in-depth vs. a bad decision).
+- **Real leader-window detection** — the upcoming leader schedule from RPC `getSlotLeaders` drives a
+  submission-timing decision (the Jito searcher `getNextScheduledLeader` is a gRPC searcher method
+  needing approved auth; we time against the RPC schedule and let the Block Engine route to the next
+  Jito leader).
 - **Visible AI reasoning** — every decision persists `{inputs, reasoning, confidence, action,
-  before/after}` and renders on a live decision timeline.
-- **Deliberate chaos** — fault injection (blockhash expiry, low tip, delayed submission,
-  dropped stream events, congestion) exercises the AI's adaptation; results are documented.
+  before/after}`, renders on a live decision timeline, and is included in the exported log.
+- **Deliberate chaos** — fault injection (blockhash expiry, low tip, …) exercises the AI's
+  adaptation; the recovery is captured in the lifecycle log + decision timeline.
 
 ## Architecture (high level)
 
@@ -111,13 +132,15 @@ Regenerate the cross-language contract after changing a Rust telemetry type:
 Prometheus sinks → dashboard, against the SolInfra mainnet stream; plus the AI strategist (tip
 decision proven end-to-end over NATS).
 
-**Integration-tested (submit pipeline).** The submit → stream-confirmed lifecycle →
-`Bundle`/`Lifecycle`/`Failure` telemetry → Postgres → lifecycle-log export path is covered
-end-to-end, without a network, by `prometheon-core/tests/proof_pipeline.rs` (asserts a populated log:
-≥10 landed + ≥2 classified failures). The assembly path is additionally dry-run validated on mainnet
-(dynamic tip from live floor, rotating tip accounts, fresh blockhash + signature; only broadcast
-needs funding). ~165 Rust + 45 TS tests; CI runs fmt · clippy · tests · schema-drift · TS typecheck +
-tests · dependency audit.
+**Integration-tested (AI-in-the-loop submit pipeline).** The full path — AI tip decision → submit →
+stream-confirmed lifecycle → on failure **classify → AI retry decision → refresh + re-price →
+resubmit to landing** → `Bundle`/`Lifecycle`/`Failure`/`Decision` telemetry → Postgres →
+lifecycle-log export (with an AI Decision Timeline) — is covered end-to-end, **without a network**, by
+`prometheon-core/tests/saga_pipeline.rs` (asserts ≥10 landed, ≥2 classified failures the agent
+recovers, and a retry decision with visible reasoning) and `proof_pipeline.rs`. The assembly path is
+additionally dry-run validated on mainnet (dynamic tip from live floor, rotating tip accounts, fresh
+blockhash + signature; only broadcast needs funding). ~180 Rust + 45 TS tests; CI runs fmt · clippy ·
+tests · schema-drift · TS typecheck + tests · dependency audit.
 
 **Final gated step — the funded mainnet proof run.** `./scripts/run-proof.sh` opens **one**
 Yellowstone stream, submits ≥10 bundles **including ≥2 deterministically-injected failures**

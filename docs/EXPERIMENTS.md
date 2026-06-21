@@ -43,9 +43,21 @@ real slots + latencies), and 2 deliberately-injected, correctly-classified failu
 (`fee_too_low`, `expired_blockhash`). This regression-guards the wiring whose absence previously made
 the exported log come out empty.
 
-In the live run (Tier 5) the deterministic `decide_retry` policy is replaced by the AI agent's
-reasoned decision over the same signals — same loop, with a visible reasoning trace — and the proof
-driver injects the same faults against mainnet to produce the explorer-verifiable log.
+## AI-in-the-loop autonomous recovery (proven without network)
+
+`prometheon-core/tests/saga_pipeline.rs` drives the full agent-in-the-loop saga (`saga::run_saga`)
+over a fake `DecisionSource` + `Submitter` with a scripted stream. It proves the headline behaviour:
+the agent makes a **tip** decision per bundle; an injected **blockhash-expiry** is detected,
+**classified**, and the agent's **retry** decision (refresh + re-price, with visible reasoning) drives
+a **resubmission that lands** — so the log shows `attempt 1 = expired_blockhash` then
+`attempt 2 = finalized`, and the same for the low-tip injection (`fee_too_low` → recovered). The core
+enforces safety on top of the agent (an expiry always forces a refresh; the tip is clamped to policy
+bounds), and `decide_retry` remains the fallback when the agent is unavailable. Asserted end-to-end:
+≥10 landed, ≥2 AI-recovered failures, and retry decisions carrying non-empty reasoning.
+
+In the live run (Tier 5) the same saga runs with `LLM_PROVIDER=anthropic`, so the reasoning traces are
+real model output, and the faults are injected against mainnet to produce the explorer-verifiable log
+plus the AI Decision Timeline.
 
 ## Methodology notes
 Develop + inject on testnet/devnet; the explorer-verifiable proof run is on mainnet. Each run is

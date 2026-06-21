@@ -130,3 +130,24 @@ Convention: `[ ]` pending · `[~]` in progress · `[x]` done. Every feature is *
 - [x] **T10** README/ARCHITECTURE corrected to true scope (read-only spine validated live; submit pipeline integration-tested; live paid proof = gated final step).
 - [x] **T11** `EXPERIMENTS.md` filled with the proven deterministic chaos-loop + pipeline results.
 - [ ] **T12 (gated on funding)** funded `NETWORK=mainnet ./scripts/run-proof.sh 12` with `LLM_PROVIDER=anthropic` → populated `logs/lifecycle-log.{json,md}` (≥10 bundles, ≥2 failures, explorer-verifiable slots) + a real AI reasoning trace; fill README/EXPERIMENTS live numbers; record demo.
+
+## Road to 10/10 (2026-06-21) `[~]` — put the AI genuinely IN the running system
+A second brutal review found the agent, retry saga, and leader-window were built + tested but NOT in
+the run path (the graded run used deterministic tips, never retried, emitted no Decision telemetry).
+- [x] **W1** AI-in-the-loop saga (`prometheon-core::saga`): `DecisionSource` + `Submitter` traits; AI
+  tip decision per bundle + classify→AI retry decision→refresh+re-price→**resubmit to landing**;
+  safety-enforced (forced refresh on expiry, tip clamp); emits Bundle/Lifecycle/Failure/**Decision**.
+  Network-free regression `tests/saga_pipeline.rs` (≥10 landed, ≥2 AI-recovered failures, retry
+  decision reasoning). Live `bin/proof.rs` plugs in NATS bus + real submitter.
+- [x] **W2** real leader-window detection: `rpc::get_slot_leaders` (`getSlotLeaders`) +
+  `leader::LeaderSchedule` (slots-until-rotation) → a live submission-timing decision. Jito searcher
+  gRPC deferred (needs protoc codegen + approved auth; risks CI) — documented as optional enhancement.
+- [x] **W3** `export::render_decisions_markdown` → "AI Decision Timeline" in `logs/lifecycle-log.md`;
+  dashboard already renders the timeline live.
+- [x] **W6** docs reframed to the owned decision "Autonomous Retry with Fault Injection"
+  (README/ARCHITECTURE §21/EXPERIMENTS); full green gate (fmt·clippy·48 test suites·schema·TS 45).
+- [ ] **W4 (gated on funding)** run the funded proof with `LLM_PROVIDER=anthropic` → real log + real
+  reasoning traces + explorer slots; fill README/EXPERIMENTS numbers.
+- [ ] **W5 (user)** publish `docs/ARCHITECTURE.md` to a public Notion/GDoc URL; record the
+  inject→AI-reason→refresh→re-price→resubmit→land→Explorer demo clip.
+- [ ] **Optional** Jito searcher-gRPC `getNextScheduledLeader` (if approved auth + protoc acceptable).

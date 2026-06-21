@@ -112,22 +112,35 @@ The engine is wired end-to-end and validated against the **live SolInfra mainnet
   `v_failure` projection views), and a Prometheus `/metrics` exporter. Validated live: slots
   streaming, congestion reacting to a real leader skip (stability `1.0 → 0.889`), 60 events on the
   bus, rows in Postgres, `prometheon_*` gauges served.
-- **AI strategist in the loop.** The tip decision is owned by the TypeScript agent over NATS
-  (`decision.request.tip`); proven end-to-end against the running agent — the tip re-priced
-  `10.5k → 12.5k → 14.5k` lamports as congestion rose while the saga drove autonomous retries
-  (refresh blockhash on expiry, re-price always) to a landing.
+- **AI in the loop — autonomous retry with fault injection (`prometheon-core::saga`).** The agent
+  owns the **retry** decision end-to-end during the run: on a non-landing the core `classify`s the
+  failure, requests a retry decision over NATS (`decision.request.retry`), and the agent reasons about
+  refresh + re-price; the core enforces safety (expiry **always** forces a blockhash refresh; the tip
+  is clamped) and resubmits the next attempt — which lands. The agent also sets the **tip** per bundle
+  (`decision.request.tip`) and makes a **submission-timing** call from the live leader schedule. Every
+  decision is emitted as `Decision` telemetry → dashboard timeline + the exported log. The
+  deterministic `prometheon-retry` policy is the safety fallback. The whole AI-driven loop, including
+  recovery (attempt 1 failed → attempt 2 landed), is regression-tested with no network in
+  `tests/saga_pipeline.rs`. Two small traits (`DecisionSource`, `Submitter`) keep it testable; the
+  live binary plugs in the NATS bus and the real submitter.
+- **Leader-window detection (`prometheon-core::leader`).** The upcoming leader schedule from Solana
+  RPC `getSlotLeaders` (`rpc::get_slot_leaders`) yields the current leader + slots-until-rotation,
+  feeding the submission-timing decision. The Jito searcher `getNextScheduledLeader` (which also says
+  *which* upcoming leaders run Jito) is a gRPC searcher-API method requiring approved auth — its HTTP
+  form 404s — so we time against the RPC schedule and rely on the Block Engine routing the bundle to
+  the next Jito leader; the searcher-gRPC path is a documented optional enhancement.
 - **Submit path.** `prometheon-core::proof` assembles a real bundle from live data (fresh blockhash,
   rotating tip account, live-floor tip clamped to policy bounds, congestion-scaled CU price), signs
   it, and either simulates (free dry-run) or submits it. Dry-run validated on mainnet: a dynamic
   3329-lamport tip, 4 rotating tip accounts, distinct blockhashes/signatures; the simulator returns
   `AccountNotFound`, i.e. assembled correctly — only funding gates broadcast.
-- **Submit → telemetry → export pipeline.** `prometheon-core::proof_run` drives all in-flight bundles
-  over **one shared** Yellowstone stream and emits `Bundle`/`Lifecycle`/`Failure` events through the
-  same `Sinks` (NATS + Postgres) the engine uses, so `export-log` reads what the run persists. The
-  full submit → stream-confirmed lifecycle → telemetry → `build_log` path is integration-tested
-  without a network in `prometheon-core/tests/proof_pipeline.rs` (asserts a populated log: 12 bundles,
-  10 landed `submitted→processed→confirmed→finalized`, 2 injected + classified failures). Fault
-  injection (`--inject low-tip,stale-blockhash`) guarantees the bounty's ≥2 failure cases.
+- **Submit → telemetry → export pipeline.** The saga (and the simpler `proof_run`) drive all in-flight
+  bundles over **one shared** Yellowstone stream and emit `Bundle`/`Lifecycle`/`Failure`/`Decision`
+  events through the same `Sinks` (NATS + Postgres) the engine uses, so `export-log` reads what the run
+  persists — producing the per-bundle lifecycle table **and an AI Decision Timeline**
+  (`export::render_decisions_markdown`). The path is integration-tested without a network
+  (`tests/proof_pipeline.rs`, `tests/saga_pipeline.rs`). Fault injection
+  (`--inject low-tip,stale-blockhash`) guarantees the bounty's ≥2 failure cases.
 - **One contract.** Rust telemetry types (`schemars`) generate `contracts/json-schema/*` and the TS
   types; CI fails on drift. The dashboard consumes the live NATS feed and labels its status honestly
   (`source: live|mock` → "live"/"simulated"), never showing a live indicator over the mock feed.
