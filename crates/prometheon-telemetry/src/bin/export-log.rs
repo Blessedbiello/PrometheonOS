@@ -8,7 +8,9 @@
 
 use std::path::Path;
 
-use prometheon_telemetry::export::{export, render_json, render_markdown};
+use prometheon_telemetry::export::{
+    export, fetch_decisions, render_decisions_markdown, render_json, render_markdown,
+};
 use prometheon_telemetry::PostgresSink;
 
 #[tokio::main]
@@ -20,14 +22,15 @@ async fn main() -> anyhow::Result<()> {
 
     let sink = PostgresSink::connect(&db).await?;
     let entries = export(sink.pool()).await?;
+    let decisions = fetch_decisions(sink.pool()).await?;
 
     let out_dir = Path::new("logs");
     std::fs::create_dir_all(out_dir)?;
     std::fs::write(out_dir.join("lifecycle-log.json"), render_json(&entries)?)?;
-    std::fs::write(
-        out_dir.join("lifecycle-log.md"),
-        render_markdown(&entries, &explorer),
-    )?;
+    // Markdown: the per-bundle lifecycle table + the AI Decision Timeline (judge-visible reasoning).
+    let mut md = render_markdown(&entries, &explorer);
+    md.push_str(&render_decisions_markdown(&decisions));
+    std::fs::write(out_dir.join("lifecycle-log.md"), md)?;
 
     let landed = entries.iter().filter(|e| e.landed()).count();
     println!(

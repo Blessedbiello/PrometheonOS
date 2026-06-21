@@ -220,12 +220,53 @@ pub fn render_json(entries: &[LifecycleLogEntry]) -> anyhow::Result<String> {
     Ok(serde_json::to_string_pretty(entries)?)
 }
 
+/// Render the **AI Decision Timeline** — the chronological reasoning traces the agent produced during
+/// the run (tip / timing / retry). This is the judge-visible evidence for the "AI Demonstration"
+/// axis: every decision shows its action, confidence, provider, and the reasoning behind it.
+pub fn render_decisions_markdown(decisions: &[Value]) -> String {
+    let mut out = String::new();
+    out.push_str("\n## AI Decision Timeline\n\n");
+    if decisions.is_empty() {
+        out.push_str("_No AI decisions were recorded for this run._\n");
+        return out;
+    }
+    out.push_str(&format!(
+        "{} AI decisions recorded during the run (the agent owns the tip + autonomous-retry decisions).\n\n",
+        decisions.len()
+    ));
+    for (i, d) in decisions.iter().enumerate() {
+        let dtype = d["decision_type"].as_str().unwrap_or("?");
+        let action = d["action"].as_str().unwrap_or("");
+        let reasoning = d["reasoning"].as_str().unwrap_or("");
+        let conf = d["confidence"].as_f64().unwrap_or(0.0);
+        let provider = d["provider"].as_str().unwrap_or("");
+        let ts = d["ts"].as_str().unwrap_or("");
+        out.push_str(&format!(
+            "**{}. [{dtype}]** {action} — confidence {conf:.2} · {provider} · {ts}\n\n",
+            i + 1
+        ));
+        if !reasoning.is_empty() {
+            out.push_str(&format!("> {reasoning}\n\n"));
+        }
+        let (before, after) = (&d["before"], &d["after"]);
+        if !before.is_null() || !after.is_null() {
+            out.push_str(&format!("`before: {before}  →  after: {after}`\n\n"));
+        }
+    }
+    out
+}
+
 /// Query the persisted events and build the lifecycle log (most recent first by insertion).
 pub async fn export(pool: &sqlx::PgPool) -> anyhow::Result<Vec<LifecycleLogEntry>> {
     let bundles = fetch_payloads(pool, "bundle").await?;
     let lifecycles = fetch_payloads(pool, "lifecycle").await?;
     let failures = fetch_payloads(pool, "failure").await?;
     Ok(build_log(&bundles, &lifecycles, &failures))
+}
+
+/// Fetch the persisted AI `decision` events (chronological) for the decision-timeline section.
+pub async fn fetch_decisions(pool: &sqlx::PgPool) -> anyhow::Result<Vec<Value>> {
+    fetch_payloads(pool, "decision").await
 }
 
 async fn fetch_payloads(pool: &sqlx::PgPool, kind: &str) -> anyhow::Result<Vec<Value>> {
@@ -297,6 +338,22 @@ mod tests {
         assert!(md.contains("https://explorer.solana.com/block/425000100"));
         assert!(md.contains("submitted→processed→confirmed"));
         assert!(md.contains("expired_blockhash"));
+    }
+
+    #[test]
+    fn decision_timeline_renders_reasoning() {
+        let decisions = vec![
+            json!({"kind":"decision","decision_type":"tip","action":"tip 15000 lamports","reasoning":"floor + congestion","confidence":0.85,"provider":"anthropic","ts":"2026-06-21T00:00:00Z","before":null,"after":{"tip":15000}}),
+            json!({"kind":"decision","decision_type":"retry","action":"refresh + re-price","reasoning":"blockhash expired; refresh and bump tip","confidence":0.9,"provider":"anthropic","ts":"2026-06-21T00:01:00Z","before":{"tip":15000},"after":{"refresh_blockhash":true,"tip":25000}}),
+        ];
+        let md = render_decisions_markdown(&decisions);
+        assert!(md.contains("AI Decision Timeline"));
+        assert!(md.contains("2 AI decisions"));
+        assert!(md.contains("[retry]"));
+        assert!(md.contains("blockhash expired; refresh and bump tip"));
+        assert!(md.contains("refresh_blockhash"));
+        // Empty case is honest.
+        assert!(render_decisions_markdown(&[]).contains("No AI decisions"));
     }
 
     #[test]
