@@ -1,25 +1,29 @@
 # PrometheonOS local infrastructure.
 #   docker compose -f infra/docker-compose.yml up -d
 # Grafana is optional: add `--profile observability`.
+#
+# SECURITY: this stack is LOCAL-ONLY. Every port is bound to 127.0.0.1 and the default credentials
+# are dev placeholders — do NOT expose it on a public/shared host. For a remote demo, put it behind a
+# VPN/firewall and override POSTGRES_PASSWORD / GRAFANA_ADMIN_PASSWORD via the environment.
 
 services:
   nats:
     image: nats:2.10-alpine
     command: ["-js", "-m", "8222"] # JetStream + monitoring
     ports:
-      - "4222:4222" # client
-      - "8222:8222" # monitoring
+      - "127.0.0.1:4222:4222" # client
+      - "127.0.0.1:8222:8222" # monitoring
     restart: unless-stopped
 
   postgres:
     image: timescale/timescaledb:2.17.2-pg16
     environment:
       POSTGRES_USER: prometheon
-      POSTGRES_PASSWORD: prometheon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prometheon}
       POSTGRES_DB: prometheon
     ports:
       # Host 55432 → container 5432 (lower ports are often taken by local Postgres instances).
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -34,7 +38,7 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     extra_hosts:
       - "host.docker.internal:host-gateway" # scrape the engine running on the host
     restart: unless-stopped
@@ -43,10 +47,10 @@ services:
     image: grafana/grafana:11.4.0
     profiles: ["observability"]
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: prometheon
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-prometheon}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - ./grafana:/etc/grafana/provisioning
     depends_on:

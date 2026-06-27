@@ -106,7 +106,7 @@ const DEFAULT_TESTNET_RPC: &str = "https://api.testnet.solana.com";
 const DEFAULT_TESTNET_JITO: &str = "https://testnet.block-engine.jito.wtf";
 const DEFAULT_TESTNET_WALLET: &str = "./wallets/payer.testnet.json";
 const DEFAULT_NATS: &str = "nats://localhost:4222";
-const DEFAULT_METRICS_ADDR: &str = "0.0.0.0:9100";
+const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9100";
 const DEFAULT_CHANNEL_CAPACITY: usize = 8192;
 
 /// Resolve raw env values into an active [`Config`], applying network selection + defaults.

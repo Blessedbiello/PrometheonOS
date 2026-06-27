@@ -38,7 +38,17 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
+      # Drift-check the JSON-Schema → TS half of the contract (the Rust → JSON-Schema half is gated in
+      # the rust job via `schema-gen --check`). Together they enforce the single cross-language contract.
+      - name: contracts/ts drift (JSON Schema → TS)
+        run: |
+          for f in contracts/json-schema/*.schema.json; do
+            base="$(basename "$f" .schema.json)"
+            npx --yes json-schema-to-typescript@15 -i "$f" -o "contracts/ts/${base}.d.ts"
+          done
+          git diff --exit-code -- contracts/ts \
+            || { echo "::error::contracts/ts is stale — run scripts/gen-contracts.sh and commit"; exit 1; }
       - run: pnpm --filter @prometheon/ai-agent typecheck
       - run: pnpm --filter @prometheon/ai-agent test
       - run: pnpm --filter @prometheon/dashboard typecheck
@@ -62,5 +72,5 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level high

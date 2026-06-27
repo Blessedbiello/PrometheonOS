@@ -23,13 +23,17 @@ contracts/
 cargo run -p prometheon-telemetry --bin schema-gen
 ```
 
-## Drift check (CI)
+## Drift check (CI) — both halves are gated
 
 ```bash
+# half 1 — Rust → JSON Schema (rust CI job)
 cargo run -p prometheon-telemetry --bin schema-gen -- --check
+# half 2 — JSON Schema → TS (ts CI job): regenerate contracts/ts and `git diff --exit-code`
 ```
-Regenerates the schemas in-memory and fails if the checked-in files differ. This runs in CI, so a
-change to a Rust contract type that isn't reflected here (or vice-versa) breaks the build.
+The rust job regenerates the schemas in-memory and fails if `json-schema/` differs from the Rust
+types; the ts job regenerates `ts/` from `json-schema/` and fails if it differs from the committed
+files. So a change on either side that isn't reflected here breaks the build — the contract cannot
+silently drift in either direction.
 
 ## Not a hand-edited boundary
 

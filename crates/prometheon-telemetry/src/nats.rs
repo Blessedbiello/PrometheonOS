@@ -26,7 +26,9 @@ pub struct TelemetryBus {
 }
 
 impl TelemetryBus {
-    /// Connect to a NATS server.
+    /// Connect to a NATS server. Credentials may be embedded in `url`
+    /// (`nats://user:pass@host`) — enable auth for any non-local deployment; the default docker NATS
+    /// is local-only (bound to `127.0.0.1`) and unauthenticated.
     pub async fn connect(url: &str) -> anyhow::Result<Self> {
         let client = async_nats::connect(url)
             .await
