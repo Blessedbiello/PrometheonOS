@@ -13,13 +13,14 @@ use chrono::{DateTime, Utc};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use prometheon_failure::{classify, FailureClassification, FailureSignals};
+use prometheon_failure::{classify, FailureClassification, FailureSignals, OnChainError};
 use prometheon_faultinject::{normal_signals, FaultScenario};
 use prometheon_ingest::IngestMessage;
 use prometheon_lifecycle::lifecycle::LifecycleEvent;
 use prometheon_telemetry::{
     BundleEvent, BundlePhase, FailureRecord, LifecycleRecord, TelemetryEvent,
 };
+use serde_json::Value;
 
 use crate::proof::PendingBundles;
 use crate::sinks::EventSink;
@@ -96,8 +97,63 @@ pub fn failure_event(id: &str, classification: FailureClassification) -> Telemet
     })
 }
 
+/// Real on-chain / Jito error observations for a non-landed bundle, gathered live (block height vs
+/// `lastValidBlockHeight`, `isBlockhashValid`, and the bundle's decoded `err`). Mapping this into
+/// [`FailureSignals`] lets the classifier decide the class from **real error data** rather than the
+/// injected fault tag — what the bounty asks for.
+#[derive(Debug, Clone, Default)]
+pub struct FailureObservation {
+    pub tip_lamports: u64,
+    pub tip_floor_p50_lamports: u64,
+    /// `isBlockhashValid` result (if the probe could fetch it).
+    pub blockhash_valid: Option<bool>,
+    /// Current block height (if fetched).
+    pub block_height: Option<u64>,
+    /// The submitted blockhash's `lastValidBlockHeight` (if known).
+    pub last_valid_block_height: Option<u64>,
+    /// Decoded on-chain error from `getBundleStatuses.err`, if the bundle landed-and-reverted.
+    pub on_chain_error: Option<OnChainError>,
+    /// Inflight status reported a terminal failure across regions.
+    pub bundle_status_failed: bool,
+}
+
+/// Build [`FailureSignals`] from real observations. A `confirmation_timeout` baseline is set (we only
+/// probe non-lands); the classifier's priority order means a decoded on-chain error, an inflight
+/// failure, a real blockhash expiry, or a sub-floor tip each override it.
+pub fn signals_from_observation(obs: &FailureObservation) -> FailureSignals {
+    let mut s = normal_signals();
+    s.landed = false;
+    s.confirmation_timeout = true;
+    s.tip_lamports = obs.tip_lamports;
+    s.tip_floor_p50_lamports = obs.tip_floor_p50_lamports;
+    s.blockhash_valid = obs.blockhash_valid;
+    s.block_height_exceeded = matches!(
+        (obs.block_height, obs.last_valid_block_height),
+        (Some(h), Some(lvbh)) if h > lvbh
+    );
+    s.on_chain_error = obs.on_chain_error.clone();
+    s.bundle_status_failed = obs.bundle_status_failed;
+    s
+}
+
+/// Decode a Jito `getBundleStatuses.err` JSON value into an [`OnChainError`] (best-effort string
+/// match against the common Solana error shapes).
+pub fn decode_on_chain_error(err: &Value) -> OnChainError {
+    let s = err.to_string().to_lowercase();
+    if s.contains("computebudgetexceeded") || s.contains("computebudget") {
+        OnChainError::ComputeBudgetExceeded
+    } else if s.contains("alreadyprocessed") || s.contains("duplicate") {
+        OnChainError::DuplicateSignature
+    } else if s.contains("instructionerror") {
+        OnChainError::InstructionError
+    } else {
+        OnChainError::Other(err.to_string())
+    }
+}
+
 /// Classify why a tracked bundle did not land — from the injected scenario when present, otherwise
-/// from the observed signals (tip vs floor, confirmation timeout).
+/// from the observed signals (tip vs floor, confirmation timeout). The live path prefers
+/// [`signals_from_observation`] (real error data) via [`crate::saga::Submitter::probe_failure`].
 pub fn classify_nonland(b: &SubmittedBundle) -> FailureClassification {
     let mut signals: FailureSignals = normal_signals();
     signals.landed = false;
@@ -259,5 +315,69 @@ mod tests {
             classify_nonland(&mk(None, 50_000)).class,
             FailureClass::ConfirmationTimeout
         );
+    }
+
+    #[test]
+    fn real_signals_classify_from_data_not_the_injected_tag() {
+        use prometheon_failure::OnChainError;
+        // Expired: real block height past lastValidBlockHeight (no injection tag involved).
+        let expired = signals_from_observation(&FailureObservation {
+            tip_lamports: 14_500,
+            tip_floor_p50_lamports: 20_000,
+            blockhash_valid: Some(false),
+            block_height: Some(1_000),
+            last_valid_block_height: Some(900),
+            ..Default::default()
+        });
+        assert_eq!(classify(&expired).class, FailureClass::ExpiredBlockhash);
+
+        // Fee too low: blockhash still valid, tip below the floor.
+        let low = signals_from_observation(&FailureObservation {
+            tip_lamports: 1_000,
+            tip_floor_p50_lamports: 20_000,
+            blockhash_valid: Some(true),
+            block_height: Some(900),
+            last_valid_block_height: Some(1_000),
+            ..Default::default()
+        });
+        assert_eq!(classify(&low).class, FailureClass::FeeTooLow);
+
+        // Landed-and-reverted compute error decoded from real getBundleStatuses.err.
+        let compute = signals_from_observation(&FailureObservation {
+            tip_lamports: 14_500,
+            tip_floor_p50_lamports: 20_000,
+            on_chain_error: Some(OnChainError::ComputeBudgetExceeded),
+            ..Default::default()
+        });
+        assert_eq!(classify(&compute).class, FailureClass::ComputeExceeded);
+
+        // Unknown non-land, valid blockhash, adequate tip → confirmation timeout.
+        let timeout = signals_from_observation(&FailureObservation {
+            tip_lamports: 50_000,
+            tip_floor_p50_lamports: 20_000,
+            blockhash_valid: Some(true),
+            block_height: Some(900),
+            last_valid_block_height: Some(1_000),
+            ..Default::default()
+        });
+        assert_eq!(classify(&timeout).class, FailureClass::ConfirmationTimeout);
+    }
+
+    #[test]
+    fn decode_on_chain_error_maps_known_shapes() {
+        use prometheon_failure::OnChainError;
+        use serde_json::json;
+        assert_eq!(
+            decode_on_chain_error(&json!("ComputeBudgetExceeded")),
+            OnChainError::ComputeBudgetExceeded
+        );
+        assert!(matches!(
+            decode_on_chain_error(&json!({ "InstructionError": [0, "X"] })),
+            OnChainError::InstructionError
+        ));
+        assert!(matches!(
+            decode_on_chain_error(&json!({ "weird": 1 })),
+            OnChainError::Other(_)
+        ));
     }
 }

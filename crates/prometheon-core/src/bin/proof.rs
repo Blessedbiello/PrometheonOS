@@ -16,12 +16,13 @@
 //! ≥2 failure cases: `low-tip` submits a sub-floor tip (→ `fee_too_low`); `stale-blockhash` waits for
 //! a captured blockhash to expire, then submits on it (→ `expired_blockhash`, a guaranteed non-land).
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use prometheon_bundle::{BlockEngineClient, BlockEngineConfig, Percentile, TipFloor};
 use prometheon_core::{
     config::Config,
-    leader::{LeaderSchedule, LeaderWindow},
+    leader::{timing_hold_slots, LeaderSchedule, LeaderWindow},
     proof,
     proof_run::{self, SubmittedBundle},
     rpc::{BlockhashInfo, RpcClient},
@@ -29,6 +30,7 @@ use prometheon_core::{
     sinks::{EventSink, Sinks},
     wallet,
 };
+use prometheon_failure::FailureSignals;
 use prometheon_faultinject::FaultScenario;
 use prometheon_ingest::yellowstone::{self, SubscriptionSpec, YellowstoneConfig};
 use prometheon_telemetry::{Decision, DecisionType, PostgresSink, TelemetryBus, TelemetryEvent};
@@ -318,6 +320,9 @@ struct LiveSubmitter {
     floor_p50: u64,
     /// Captured-then-expired blockhash reused for stale-blockhash injection (fetched once).
     stale: Mutex<Option<BlockhashInfo>>,
+    /// Per-base blockhash of the last attempt, so a non-refresh retry can REUSE it (honoring
+    /// `AttemptSpec.refresh_blockhash`) instead of always re-fetching.
+    blockhash_cache: Mutex<HashMap<String, BlockhashInfo>>,
 }
 
 impl LiveSubmitter {
@@ -336,12 +341,29 @@ impl LiveSubmitter {
 
 impl Submitter for LiveSubmitter {
     async fn submit(&self, spec: &AttemptSpec) -> anyhow::Result<SubmittedBundle> {
-        let current_slot = self.rpc.get_slot().await.unwrap_or(0);
-        // tip override + stale blockhash + give-up watermark (slots) by injection type.
+        // Real-slot give-up watermark; on a transient RPC failure, OMIT it (rely on the global
+        // deadline) rather than collapsing it to slot 0, which would instantly false-fail a healthy
+        // bundle and churn paid resubmissions.
+        let current_slot = self.rpc.get_slot().await.ok();
+        // tip override + blockhash + give-up budget by injection / refresh policy.
         let (tip_override, bh_override, give_up_after) = match spec.injected {
             Some(FaultScenario::LowTip { tip_lamports }) => (Some(tip_lamports), None, 64),
             Some(FaultScenario::BlockhashExpiry) => (None, Some(self.stale_blockhash().await?), 2),
-            _ => (spec.tip_lamports, None, 150),
+            _ => {
+                // Honor the retry policy's refresh flag: when a refresh is NOT required (e.g. a
+                // fee-too-low retry while the blockhash is still valid), reuse the base's cached
+                // blockhash and only re-price; otherwise fetch a fresh one (override = None).
+                let reuse = if spec.refresh_blockhash {
+                    None
+                } else {
+                    self.blockhash_cache
+                        .lock()
+                        .await
+                        .get(&spec.base_id)
+                        .cloned()
+                };
+                (spec.tip_lamports, reuse, 150)
+            }
         };
         let plan = proof::prepare_attempt(
             &self.rpc,
@@ -355,6 +377,14 @@ impl Submitter for LiveSubmitter {
             bh_override,
         )
         .await?;
+        // Remember the blockhash actually used so a later non-refresh retry of this base reuses it.
+        self.blockhash_cache.lock().await.insert(
+            spec.base_id.clone(),
+            BlockhashInfo {
+                blockhash: plan.blockhash.clone(),
+                last_valid_block_height: plan.last_valid_block_height,
+            },
+        );
         let bundle_id = match self
             .jito
             .send_bundle(std::slice::from_ref(&plan.tx_base64))
@@ -386,8 +416,63 @@ impl Submitter for LiveSubmitter {
             injected: spec.injected,
             base_id: spec.base_id.clone(),
             attempt_no: spec.attempt_no,
-            deadline_slot: Some(current_slot.saturating_add(give_up_after)),
+            deadline_slot: current_slot.map(|s| s.saturating_add(give_up_after)),
         })
+    }
+
+    /// Probe real on-chain / Jito error data for a non-landed bundle so the saga classifies the
+    /// failure from observed signals (real blockhash expiry, decoded `getBundleStatuses.err`, or an
+    /// inflight terminal failure) — not the injection tag.
+    async fn probe_failure(&self, sb: &SubmittedBundle) -> Option<FailureSignals> {
+        // The base's last blockhash → check expiry from real chain state.
+        let bh = self.blockhash_cache.lock().await.get(&sb.base_id).cloned();
+        let blockhash_valid = match &bh {
+            Some(b) => self.rpc.is_blockhash_valid(&b.blockhash).await.ok(),
+            None => None,
+        };
+        let block_height = self.rpc.block_height().await.ok();
+        let last_valid_block_height = bh.as_ref().map(|b| b.last_valid_block_height);
+
+        // Real Jito error data for this bundle (best-effort: decode getBundleStatuses.err, else
+        // consult the fast inflight view for a terminal failure).
+        let (on_chain_error, bundle_status_failed) = match self
+            .jito
+            .get_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
+            .await
+        {
+            Ok(statuses) => match statuses.value.iter().find(|e| e.bundle_id == sb.bundle_id) {
+                Some(e) if e.has_error() => {
+                    (e.err.as_ref().map(proof_run::decode_on_chain_error), false)
+                }
+                _ => {
+                    let failed = self
+                        .jito
+                        .get_inflight_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
+                        .await
+                        .ok()
+                        .map(|inf| {
+                            inf.value.iter().any(|e| {
+                                e.bundle_id == sb.bundle_id && e.status.is_terminal_failure()
+                            })
+                        })
+                        .unwrap_or(false);
+                    (None, failed)
+                }
+            },
+            Err(_) => (None, false),
+        };
+
+        Some(proof_run::signals_from_observation(
+            &proof_run::FailureObservation {
+                tip_lamports: sb.tip_lamports,
+                tip_floor_p50_lamports: self.floor_p50,
+                blockhash_valid,
+                block_height,
+                last_valid_block_height,
+                on_chain_error,
+                bundle_status_failed,
+            },
+        ))
     }
 }
 
@@ -462,6 +547,12 @@ async fn run_live(
         "congestionScore": congestion,
     });
     if let Some(d) = decider.decide(DecisionType::Timing, timing_ctx).await {
+        let ai_hold = d
+            .after
+            .as_ref()
+            .and_then(|a| a.get("hold"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         println!(
             "leader window: current_leader={} next_change_in={:?} → timing: {} ({})",
             schedule.current_leader().unwrap_or("?"),
@@ -470,6 +561,13 @@ async fn run_live(
             d.reasoning,
         );
         sinks.emit(&TelemetryEvent::Decision(d)).await;
+        // Submission-timing GATE: actually hold (bounded) for a fresher leader window when asked,
+        // instead of merely printing the decision.
+        let hold = timing_hold_slots(schedule.slots_until_leader_change(), ai_hold, 8);
+        if hold > 0 {
+            println!("   holding ~{hold} slots for a fresher leader window before submitting…");
+            tokio::time::sleep(Duration::from_millis(hold.saturating_mul(420))).await;
+        }
     }
 
     let submitter = LiveSubmitter {
@@ -481,6 +579,7 @@ async fn run_live(
         region: proof_run::region_from_url(&config.jito_block_engine_url),
         floor_p50,
         stale: Mutex::new(None),
+        blockhash_cache: Mutex::new(HashMap::new()),
     };
 
     // One logical bundle per attempt slot; injected faults sit on the LAST attempts (set up earlier).

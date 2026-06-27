@@ -6,6 +6,7 @@
 //! and **resubmitted to a landing**, and that both the failed attempt and the recovered one appear in
 //! the lifecycle log.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,7 +15,7 @@ use serde_json::{json, Value};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use prometheon_core::proof_run::SubmittedBundle;
+use prometheon_core::proof_run::{signals_from_observation, FailureObservation, SubmittedBundle};
 use prometheon_core::saga::{
     run_saga, AttemptSpec, BaseBundle, DecisionSource, SagaConfig, Submitter,
 };
@@ -257,4 +258,136 @@ async fn saga_runs_ai_tip_decision_and_autonomous_retry_to_landing() {
     assert_eq!(lt1.failure_class.as_deref(), Some("fee_too_low"));
     let lt2 = log.iter().find(|e| e.bundle_id == "bundle-10#a2").unwrap();
     assert!(lt2.landed());
+}
+
+/// Counts how many times the submitter is invoked.
+struct CountingSubmitter {
+    n: AtomicUsize,
+}
+impl Submitter for CountingSubmitter {
+    async fn submit(&self, spec: &AttemptSpec) -> anyhow::Result<SubmittedBundle> {
+        self.n.fetch_add(1, Ordering::SeqCst);
+        Ok(SubmittedBundle {
+            bundle_id: format!("{}#a{}", spec.base_id, spec.attempt_no),
+            signature: format!("{}-s{}", spec.base_id, spec.attempt_no),
+            tip_lamports: spec.tip_lamports.unwrap_or(14_500),
+            tip_account: "Tip".into(),
+            region: "ny".into(),
+            submitted_at: ts(0),
+            tip_floor_p50_lamports: 20_000,
+            injected: spec.injected,
+            base_id: spec.base_id.clone(),
+            attempt_no: spec.attempt_no,
+            deadline_slot: None, // never watermark-expire; relies on the global deadline
+        })
+    }
+}
+
+#[tokio::test]
+async fn post_deadline_sweep_records_failure_without_resubmitting() {
+    // A bundle that never lands and never hits a watermark must, at the deadline, be recorded as a
+    // failure WITHOUT a second (untracked, tip-paying) submission.
+    let bases = vec![BaseBundle {
+        base_id: "b".into(),
+        injected: None,
+        tip_context: json!({}),
+    }];
+    let (tx, mut rx) = mpsc::channel(8);
+    drop(tx); // no stream events → the base never reaches confirmed
+
+    let sub = CountingSubmitter {
+        n: AtomicUsize::new(0),
+    };
+    let sink = CapturingSink::default();
+    let cfg = SagaConfig {
+        max_attempts: 3,
+        global_deadline: Instant::now() + Duration::from_millis(200),
+    };
+    let summary = run_saga(&sink, &FakeDecider, &sub, bases, &mut rx, cfg).await;
+
+    assert_eq!(
+        sub.n.load(Ordering::SeqCst),
+        1,
+        "only attempt 1 is submitted; the post-deadline sweep must NOT resubmit"
+    );
+    assert_eq!(summary.total, 1);
+    assert_eq!(summary.failed, 1, "the stuck base is recorded as a failure");
+    assert_eq!(summary.landed, 0);
+}
+
+/// A submitter whose `probe_failure` returns REAL expiry signals (block height past
+/// lastValidBlockHeight) regardless of the injection tag — modelling the live RPC/Jito probe.
+struct ProbeSubmitter;
+impl Submitter for ProbeSubmitter {
+    async fn submit(&self, spec: &AttemptSpec) -> anyhow::Result<SubmittedBundle> {
+        Ok(SubmittedBundle {
+            bundle_id: format!("{}#a{}", spec.base_id, spec.attempt_no),
+            signature: format!("{}-s{}", spec.base_id, spec.attempt_no),
+            tip_lamports: 14_500, // adequate tip → the injection/heuristic path would say "timeout"
+            tip_account: "Tip".into(),
+            region: "ny".into(),
+            submitted_at: ts(spec.attempt_no as i64),
+            tip_floor_p50_lamports: 20_000,
+            injected: None, // NOT tagged as expiry — only the probe knows it expired
+            base_id: spec.base_id.clone(),
+            attempt_no: spec.attempt_no,
+            deadline_slot: if spec.attempt_no == 1 {
+                Some(1_000)
+            } else {
+                None
+            },
+        })
+    }
+    async fn probe_failure(
+        &self,
+        _sb: &SubmittedBundle,
+    ) -> Option<prometheon_failure::FailureSignals> {
+        Some(signals_from_observation(&FailureObservation {
+            tip_lamports: 14_500,
+            tip_floor_p50_lamports: 20_000,
+            blockhash_valid: Some(false),
+            block_height: Some(1_000),
+            last_valid_block_height: Some(900),
+            ..Default::default()
+        }))
+    }
+}
+
+#[tokio::test]
+async fn failure_is_classified_from_real_probe_signals_not_the_injection_tag() {
+    let bases = vec![BaseBundle {
+        base_id: "px".into(),
+        injected: None,
+        tip_context: json!({}),
+    }];
+    let (tx, mut rx) = mpsc::channel(64);
+    // Trip attempt-1's give-up watermark → fail_and_retry → probe → ExpiredBlockhash → recover.
+    tx.send(slot_msg(2_000, SlotStatus::Confirmed, ts(5)))
+        .await
+        .unwrap();
+    tx.send(tx_msg("px-s2", 3_000, ts(6))).await.unwrap();
+    tx.send(slot_msg(3_000, SlotStatus::Confirmed, ts(7)))
+        .await
+        .unwrap();
+    tx.send(slot_msg(3_000, SlotStatus::Finalized, ts(19)))
+        .await
+        .unwrap();
+    drop(tx);
+
+    let sink = CapturingSink::default();
+    let cfg = SagaConfig {
+        max_attempts: 3,
+        global_deadline: Instant::now() + Duration::from_secs(10),
+    };
+    let summary = run_saga(&sink, &FakeDecider, &ProbeSubmitter, bases, &mut rx, cfg).await;
+
+    assert_eq!(summary.failed, 1);
+    assert_eq!(summary.landed, 1, "attempt 2 recovers");
+    let log = export(&sink.events.lock().unwrap());
+    let a1 = log.iter().find(|e| e.bundle_id == "px#a1").unwrap();
+    assert_eq!(
+        a1.failure_class.as_deref(),
+        Some("expired_blockhash"),
+        "real probe signals (not the None injection tag → which would be confirmation_timeout) drive the class"
+    );
 }

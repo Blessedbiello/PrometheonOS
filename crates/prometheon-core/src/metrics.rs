@@ -15,13 +15,14 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 
 /// Cumulative engine counters surfaced as Prometheus counters.
+///
+/// Scoped to what the read-only engine actually produces. (Bundle submit/land/retry counts live in
+/// the proof saga's `ProofSummary` and the per-bundle telemetry, not here — the engine never submits,
+/// so exposing always-zero submit gauges would be misleading.)
 #[derive(Debug, Default, Clone)]
 pub struct EngineCounters {
     pub slots_total: u64,
     pub telemetry_events_total: u64,
-    pub bundles_submitted_total: u64,
-    pub bundles_landed_total: u64,
-    pub retries_total: u64,
     pub stream_reconnects_total: u64,
 }
 
@@ -120,24 +121,6 @@ pub fn render_prometheus(health: Option<&HealthSnapshot>, c: &EngineCounters) ->
         "prometheon_telemetry_events_total",
         "Telemetry events emitted.",
         c.telemetry_events_total,
-    );
-    counter(
-        &mut out,
-        "prometheon_bundles_submitted_total",
-        "Bundles submitted to the Block Engine.",
-        c.bundles_submitted_total,
-    );
-    counter(
-        &mut out,
-        "prometheon_bundles_landed_total",
-        "Bundles confirmed landed.",
-        c.bundles_landed_total,
-    );
-    counter(
-        &mut out,
-        "prometheon_retries_total",
-        "Retry attempts.",
-        c.retries_total,
     );
     counter(
         &mut out,

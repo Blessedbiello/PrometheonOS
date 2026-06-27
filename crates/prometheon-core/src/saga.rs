@@ -21,7 +21,7 @@ use serde_json::{json, Value};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use prometheon_failure::FailureClass;
+use prometheon_failure::{classify, FailureClass, FailureSignals};
 use prometheon_faultinject::FaultScenario;
 use prometheon_ingest::IngestMessage;
 use prometheon_retry::policy::{decide_retry, RetryAction};
@@ -65,6 +65,17 @@ pub trait Submitter {
         &self,
         spec: &AttemptSpec,
     ) -> impl std::future::Future<Output = anyhow::Result<SubmittedBundle>> + Send;
+
+    /// Probe **real** on-chain / Jito error data for a non-landed bundle so the failure is classified
+    /// from observed signals (block height vs `lastValidBlockHeight`, `isBlockhashValid`, decoded
+    /// `getBundleStatuses.err`) rather than the injection tag. Default `None` → the caller falls back
+    /// to the injection/heuristic classifier; the live submitter overrides it.
+    fn probe_failure(
+        &self,
+        _sb: &SubmittedBundle,
+    ) -> impl std::future::Future<Output = Option<FailureSignals>> + Send {
+        async { Option::<FailureSignals>::None }
+    }
 }
 
 /// One logical bundle to attempt (with the context the AI tip decision reasons over).
@@ -230,9 +241,11 @@ impl<E: EventSink, D: DecisionSource, S: Submitter> Saga<'_, E, D, S> {
         }
     }
 
-    /// Classify the failure, ask the AI whether/how to retry, emit the decision, and either resubmit
-    /// the next attempt or abandon the bundle.
-    async fn fail_and_retry(&mut self, attempt_id: &str) {
+    /// Classify the failure, emit it, and — when `allow_retry` — ask the AI whether/how to retry and
+    /// either resubmit the next attempt or abandon. `allow_retry=false` (the post-deadline sweep)
+    /// records the failure for the log but **never** submits a new attempt (no LLM await, no paid tip
+    /// after the run has ended).
+    async fn fail_and_retry(&mut self, attempt_id: &str, allow_retry: bool) {
         if self.failed.contains(attempt_id) {
             return;
         }
@@ -245,11 +258,24 @@ impl<E: EventSink, D: DecisionSource, S: Submitter> Saga<'_, E, D, S> {
         self.failed.insert(attempt_id.to_string());
         self.summary.failed += 1;
 
-        let classification = classify_nonland(&sb);
+        // Prefer real on-chain/Jito error data (the live submitter's probe); fall back to the
+        // injection/heuristic classifier when no probe data is available (e.g. tests, agent-down).
+        let classification = match self.submitter.probe_failure(&sb).await {
+            Some(signals) => classify(&signals),
+            None => classify_nonland(&sb),
+        };
         let class = classification.class;
         self.sink
             .emit(&failure_event(attempt_id, classification))
             .await;
+
+        if !allow_retry {
+            // Terminal sweep: the run is over — record the failure but do not submit anything new.
+            if let Some(b) = self.bases.get_mut(&sb.base_id) {
+                b.done = true;
+            }
+            return;
+        }
 
         let base_ctx = self
             .bases
@@ -349,7 +375,7 @@ impl<E: EventSink, D: DecisionSource, S: Submitter> Saga<'_, E, D, S> {
             })
             .collect();
         for id in expired {
-            self.fail_and_retry(&id).await;
+            self.fail_and_retry(&id, true).await;
         }
     }
 
@@ -416,7 +442,7 @@ impl<E: EventSink, D: DecisionSource, S: Submitter> Saga<'_, E, D, S> {
                         let id = c.bundle_id.clone();
                         self.emit_last_lifecycle(&id).await;
                         if tx.failed {
-                            self.fail_and_retry(&id).await;
+                            self.fail_and_retry(&id, true).await;
                         }
                     }
                     self.reconcile().await;
@@ -456,7 +482,8 @@ impl<E: EventSink, D: DecisionSource, S: Submitter> Saga<'_, E, D, S> {
             .map(|b| b.current_attempt_id.clone())
             .collect();
         for id in stuck {
-            self.fail_and_retry(&id).await;
+            // Run is over: record the failure, never submit a new (untracked, tip-paying) attempt.
+            self.fail_and_retry(&id, false).await;
         }
     }
 }

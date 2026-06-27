@@ -88,6 +88,16 @@ impl LeaderSchedule {
     }
 }
 
+/// The submission-timing gate: how many slots to **hold** before submitting. When the AI timing
+/// decision asks to hold, align to the next leader rotation (maximize runway in a fresh window) but
+/// never wait more than `cap` slots, so the gate can never hang the run. `0` means submit now.
+pub fn timing_hold_slots(slots_until_change: Option<u64>, ai_hold: bool, cap: u64) -> u64 {
+    if !ai_hold {
+        return 0;
+    }
+    slots_until_change.unwrap_or(0).min(cap)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -142,6 +152,14 @@ mod tests {
         assert_eq!(s.current_leader(), Some("Val1"));
         assert_eq!(s.slots_until_leader_change(), Some(4));
         assert_eq!(s.next_leader_change_slot(), Some(1_004));
+    }
+
+    #[test]
+    fn timing_hold_is_bounded_and_respects_the_decision() {
+        assert_eq!(timing_hold_slots(Some(5), true, 8), 5); // hold to the next rotation
+        assert_eq!(timing_hold_slots(Some(20), true, 8), 8); // capped — never hang
+        assert_eq!(timing_hold_slots(Some(5), false, 8), 0); // submit now
+        assert_eq!(timing_hold_slots(None, true, 8), 0); // unknown schedule → don't hold
     }
 
     #[test]
