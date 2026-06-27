@@ -14,18 +14,26 @@ professional Solana infrastructure team — not a transaction sender with an LLM
 
 ## The AI decision it owns — Autonomous Retry with Fault Injection
 
-The agent owns the **retry decision** end-to-end inside the live run. We deliberately inject a
-blockhash-expiry (and a sub-floor tip); when a bundle doesn't land, the deterministic core
-**classifies** the failure and asks the agent — over NATS — *whether and how to recover*. The agent
-reasons (refresh the blockhash? re-price the tip, and to what?), the core enforces safety invariants
-(an expiry **always** forces a refresh; the tip is clamped to policy bounds), and it **resubmits the
-next attempt** — which lands. The agent also sets the **tip** per bundle and makes a
-**submission-timing** call from the live leader schedule. Every decision is persisted with its full
-`{inputs, reasoning, confidence, action, before/after}` trace, renders on the live dashboard timeline,
-and is exported into the lifecycle log. This is a real reasoned decision in the loop — not sequential
-automation. The deterministic policy (`prometheon-retry`) is the safety fallback when the agent is
-unavailable; the saga + recovery are regression-tested end-to-end without a network in
-[`crates/prometheon-core/tests/saga_pipeline.rs`](crates/prometheon-core/tests/saga_pipeline.rs).
+The agent **drives the recovery** of a failed bundle. We deliberately inject a blockhash-expiry (and
+a sub-floor tip); when a bundle doesn't land, the deterministic core **classifies** the failure from
+the stream and asks the agent — over NATS — *how to recover*. The agent reasons in plain English and
+returns the concrete levers the engine then acts on: the new **tip** (read from `after.tip`, enforced
+by the contract) and whether to **refresh the blockhash** (`after.refresh_blockhash`); the core
+**resubmits the next attempt**, which lands.
+
+**Honest division of authority:** the agent owns the *economics and the refresh escalation* (tip
+sizing per bundle, the retry's re-price, and adding a refresh), and supplies the visible reasoning;
+the deterministic policy (`prometheon-retry`) owns the *safety gate* — it decides retry-vs-abandon and
+the attempt cap, **always** forces a blockhash refresh on a true expiry (the model can add one but
+never remove it), and the tip is clamped to policy bounds before signing. So this is a genuine
+reasoned decision in the loop (not sequential automation), with the core as a safety envelope the
+model cannot override. The agent also makes a **submission-timing** call from the live leader
+schedule. Every decision persists its full `{inputs, reasoning, confidence, action, before/after}`
+trace, renders on the live dashboard timeline, and is exported into the lifecycle log. The saga +
+recovery are regression-tested end-to-end without a network in
+[`crates/prometheon-core/tests/saga_pipeline.rs`](crates/prometheon-core/tests/saga_pipeline.rs); the
+agent's causal contract (it must emit `after.tip`/`after.refresh_blockhash` or the reply is rejected,
+never silently treated as a decision) is enforced in `ai-agent` and tested there.
 
 ## Why this is different
 
@@ -163,10 +171,11 @@ contention, or congestion — it appears here *before* it shows up as outright f
 the network-health model tracks `confirm_latency_variance_ms` and folds it into the
 `congestion_score` the AI strategist reasons over.
 
-> Live: against the SolInfra mainnet stream we watched slot status advance
-> `processed → confirmed → finalized` in real time and saw stability/congestion react to real leader
-> skips within a single run. Exact per-bundle submit→confirmed deltas are recorded in
-> [`logs/lifecycle-log.md`](logs/) from the proof run.
+> Provenance: the **read-only engine** (no wallet/funding needed) streams this live against the
+> SolInfra mainnet feed — slot status advancing `processed → confirmed → finalized` and
+> stability/congestion reacting to real leader skips. Exact **per-bundle** submit→confirmed deltas
+> come from the funded proof run and will be committed to `logs/lifecycle-log.md` _(pending — see
+> Status)_; the figures here are illustrative until then.
 
 **2. Why should you never use `finalized` commitment when fetching a blockhash for a time-sensitive transaction?**
 
@@ -191,9 +200,10 @@ policy encodes precisely this — `leader_miss` / `skipped_slot` are retryable, 
 from current conditions, and the blockhash is refreshed *only* when the window itself has closed
 (`prometheon-retry::policy`).
 
-> Live: we observed real leader skips on mainnet — slot stability fell from `1.0` to `0.889` and the
-> congestion score rose in response within one run. Captured skipped-slot / leader-miss telemetry is
-> in the proof-run log.
+> Provenance: while running the **read-only engine** against the live mainnet stream during
+> development we saw real leader skips move slot stability off `1.0` and the congestion score rise in
+> response. The committed skipped-slot / leader-miss telemetry with exact figures comes from the
+> funded proof run _(pending)_; treat the numbers above as illustrative until the log is published.
 
 ## License
 

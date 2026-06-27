@@ -97,31 +97,52 @@ cores; multiple Block Engine regions allow submission fan-out. Bottleneck is cli
 not the wire — mitigated by the ingest/processing split (RFC 0001).
 ## 17. Fault injection methodology — see [`EXPERIMENTS.md`](EXPERIMENTS.md)
 ## 18. Security considerations
-No secrets in repo; keypairs gitignored; minimal mainnet funds; tip co-location prevents paying
-on failed bundles; pre/post account checks guard against uncled-block rebroadcast.
+**Fund safety.** No secrets in repo (real `.env` + `wallets/` gitignored; verified clean across git
+history); keypairs load with length validation and are never logged/cloned/serialized. The only
+value-moving instructions the wallet signs are a self-transfer (payer→payer) and the tip
+(payer→a Jito `getTipAccounts` address) — no attacker-controllable recipient, no drain/double-spend.
+Every tip is **clamped to `[1000, 1_000_000]` lamports (≤0.001 SOL) before signing**, so a poisoned AI
+decision or manipulated telemetry can overpay by at most ~0.001 SOL/bundle; the tip is **co-located**
+in the same tx as the strategy ix, so a non-landing pays nothing. The AI proposes a tip *value* within
+fixed, code-enforced bounds it cannot widen.
+
+**Known limitations (disclosed).** (1) **Retry-without-cancel** — Solana has no bundle cancel, so a
+given-up attempt and its retry can both land (two self-transfers + two clamped tips for one logical
+bundle); the economic exposure is bounded by the clamp, and a durable-nonce single-flight scheme is
+future work. (2) **Infra is local-only** — `docker-compose` binds all ports to `127.0.0.1` with dev
+placeholder credentials; NATS/Postgres/Prometheus/Grafana and the engine `/metrics` (default
+`127.0.0.1:9100`) must sit behind a VPN/firewall for any remote demo. NATS auth is supported by
+embedding credentials in `NATS_URL` (`nats://user:pass@host`); enable it for non-local deployments.
+(3) The dashboard `/api/telemetry` route is unauthenticated and intended for local/same-origin use.
 ## 19. Cost analysis _(pending — actuals from the mainnet proof run)_
 ## 20. Lessons learned _(pending — Phase 8)_
 
 ## 21. Implementation status & live validation
-The engine is wired end-to-end and validated against the **live SolInfra mainnet stream** (gRPC
-`fra.grpc.solinfra.dev:443`), not just unit-tested in isolation:
+The **read-only spine** is wired end-to-end and exercised against the live SolInfra mainnet stream
+(gRPC `fra.grpc.solinfra.dev:443`); the **funded submit/landing proof run is pending** (no committed
+lifecycle log yet — see §19/§20 and the README Status). Figures below are from development runs and
+are illustrative until the proof-run log is published:
 
 - **Ingestion → health → sinks.** `prometheon-core::engine` streams Yellowstone slots into the
   `NetworkHealthModel` and fans every `TelemetryEvent` through one `emit`: NATS pub/sub, a
   Postgres/TimescaleDB hypertable (`telemetry_event` + `v_decision`/`v_bundle`/`v_lifecycle`/
-  `v_failure` projection views), and a Prometheus `/metrics` exporter. Validated live: slots
-  streaming, congestion reacting to a real leader skip (stability `1.0 → 0.889`), 60 events on the
-  bus, rows in Postgres, `prometheon_*` gauges served.
-- **AI in the loop — autonomous retry with fault injection (`prometheon-core::saga`).** The agent
-  owns the **retry** decision end-to-end during the run: on a non-landing the core `classify`s the
-  failure, requests a retry decision over NATS (`decision.request.retry`), and the agent reasons about
-  refresh + re-price; the core enforces safety (expiry **always** forces a blockhash refresh; the tip
-  is clamped) and resubmits the next attempt — which lands. The agent also sets the **tip** per bundle
-  (`decision.request.tip`) and makes a **submission-timing** call from the live leader schedule. Every
-  decision is emitted as `Decision` telemetry → dashboard timeline + the exported log. The
-  deterministic `prometheon-retry` policy is the safety fallback. The whole AI-driven loop, including
-  recovery (attempt 1 failed → attempt 2 landed), is regression-tested with no network in
-  `tests/saga_pipeline.rs`. Two small traits (`DecisionSource`, `Submitter`) keep it testable; the
+  `v_failure` projection views), and a Prometheus `/metrics` exporter. Observed on the read-only
+  engine (no wallet needed): slots streaming, congestion reacting to a real leader skip
+  (stability `~1.0 → 0.889`), events on the bus, rows in Postgres, `prometheon_*` gauges served.
+- **AI in the loop — autonomous retry with fault injection (`prometheon-core::saga`).** On a
+  non-landing the core `classify`s the failure from the stream and requests a retry decision over NATS
+  (`decision.request.retry`); the agent reasons and returns the levers the engine acts on — the new
+  **tip** (`after.tip`) and whether to **refresh** (`after.refresh_blockhash`), enforced by a causal
+  contract (a reply omitting them is rejected, not silently treated as a decision). **Division of
+  authority:** the agent owns the economics (tip sizing + the retry re-price) and the refresh
+  *escalation*; the deterministic `prometheon-retry` policy owns the safety gate — retry-vs-abandon,
+  the attempt cap, an always-forced refresh on a real expiry (the model may add a refresh but never
+  remove one), and the tip is clamped before signing. The core resubmits the next attempt, which
+  lands. The agent also sets the per-bundle **tip** (`decision.request.tip`) and makes a
+  **submission-timing** call from the live leader schedule that gates the run with a bounded hold.
+  Every decision is emitted as `Decision` telemetry → dashboard timeline + the exported log. The whole
+  loop, including recovery (attempt 1 failed → attempt 2 landed), is regression-tested with no network
+  in `tests/saga_pipeline.rs`. Two small traits (`DecisionSource`, `Submitter`) keep it testable; the
   live binary plugs in the NATS bus and the real submitter.
 - **Leader-window detection (`prometheon-core::leader`).** The upcoming leader schedule from Solana
   RPC `getSlotLeaders` (`rpc::get_slot_leaders`) yields the current leader + slots-until-rotation,

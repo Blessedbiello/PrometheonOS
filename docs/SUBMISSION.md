@@ -73,7 +73,9 @@ pnpm --filter @prometheon/dashboard dev                # http://localhost:3000 (
   an explorer-verifiable log.
 - **Depth of Integration.** No hardcoded shortcuts — live tip floor, dynamic CU, correct commitment
   handling, stream-confirmed landing, real leader schedule, co-located no-ALT tip.
-- **AI Demonstration.** The agent owns the retry decision end-to-end *during the run*, with the full
+- **AI Demonstration.** The agent drives recovery *during the run* — it prices the tip and chooses
+  the refresh escalation (the levers the engine acts on, enforced by a causal contract), while the
+  deterministic policy owns the safety gate (retry/abandon, forced-refresh-on-expiry, tip clamp) — the full
   reasoning trace persisted, exported, and rendered live — not a sequential wrapper.
 - **Explanation.** Architecture doc + a README grounded in real observations + a network-health model,
   failure taxonomy, fault-injection experiments, and a single cross-language typed contract
