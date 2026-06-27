@@ -2,7 +2,7 @@
  * The agent orchestrator: run a provider for one decision, validate its output, and assemble the
  * full `Decision` (adding provider name, latency, timestamp, and the inputs considered).
  */
-import { decisionSchema, llmDecisionSchema, type Decision } from "./schema.js";
+import { decisionSchema, llmDecisionSchema, requireCausalAfter, type Decision } from "./schema.js";
 import type { DecisionRequest, LlmProvider } from "./providers/types.js";
 
 /**
@@ -13,6 +13,7 @@ export async function decide(provider: LlmProvider, req: DecisionRequest): Promi
   const start = Date.now();
   const raw = await provider.decide(req);
   const llm = llmDecisionSchema.parse(raw); // reject malformed model output early
+  requireCausalAfter(req.decisionType, llm.after); // the model's number must actually drive the action
   const latency_ms = Date.now() - start;
 
   return decisionSchema.parse({

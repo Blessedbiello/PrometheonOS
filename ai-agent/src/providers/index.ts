@@ -22,7 +22,7 @@ export function providerFromEnv(env: Env = process.env): LlmProvider {
     case "anthropic": {
       const key = env.ANTHROPIC_API_KEY;
       if (!key) throw new Error("LLM_PROVIDER=anthropic requires ANTHROPIC_API_KEY");
-      return new AnthropicProvider(key, env.ANTHROPIC_MODEL ?? "claude-opus-4-7");
+      return new AnthropicProvider(key, env.ANTHROPIC_MODEL ?? "claude-opus-4-8");
     }
     case "openai": {
       const key = env.OPENAI_API_KEY;

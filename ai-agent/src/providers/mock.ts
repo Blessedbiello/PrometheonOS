@@ -38,12 +38,18 @@ export class MockProvider implements LlmProvider {
           confidence: 0.65,
         };
       }
-      case "retry":
+      case "retry": {
+        const floor = num(ctx, "tipFloorP50Lamports", 10_000);
+        const last = num(ctx, "lastTipLamports", floor);
+        const tip = Math.round(Math.max(last, floor) * (1 + 0.5 * congestion));
         return {
-          action: "refresh blockhash, recalc tip, resubmit",
+          action: `refresh blockhash, re-price ${last}->${tip}`,
           reasoning: "blockhash expiry is retryable; refresh and re-price before resubmitting.",
           confidence: 0.8,
+          before: { tip: last, blockhash: "stale" },
+          after: { refresh_blockhash: true, tip },
         };
+      }
     }
   }
 }

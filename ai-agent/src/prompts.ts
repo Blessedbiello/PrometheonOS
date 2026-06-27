@@ -10,11 +10,11 @@ const ROLE =
   "You make one operational decision at a time from live network telemetry and explain it.";
 
 const OUTPUT_CONTRACT =
-  'Return ONLY a single JSON object, no prose, with exactly these keys: ' +
+  'Return ONLY a single JSON object, no prose, with these keys: ' +
   '"action" (string, a short imperative summary), ' +
   '"reasoning" (string, why — cite the telemetry), ' +
   '"confidence" (number 0..1), ' +
-  'and optionally "before" and "after" (objects showing the state change). ' +
+  'plus the required "after" object below (and optionally "before"). ' +
   "Do not wrap the JSON in markdown.";
 
 function guidance(decisionType: DecisionType): string {
@@ -38,9 +38,25 @@ function guidance(decisionType: DecisionType): string {
   }
 }
 
+/**
+ * The EXACT `after` shape the deterministic core reads for this decision type. The engine acts on
+ * these keys, so they are mandatory (the agent rejects a reply that omits them) — this is what makes
+ * the model's number causally drive the action rather than being decorative.
+ */
+function afterContract(decisionType: DecisionType): string {
+  switch (decisionType) {
+    case "tip":
+      return 'REQUIRED: "after": { "tip": <integer lamports the engine will use> }.';
+    case "retry":
+      return 'REQUIRED: "after": { "refresh_blockhash": <true|false>, "tip": <integer lamports> } — the engine reads these exact keys.';
+    case "timing":
+      return 'Optionally include "after": { "hold": <true|false> } describing the timing choice.';
+  }
+}
+
 /** Build the `{ system, user }` prompt for a decision request. */
 export function buildPrompt(req: DecisionRequest): { system: string; user: string } {
-  const system = `${ROLE}\n\n${guidance(req.decisionType)}\n\n${OUTPUT_CONTRACT}`;
+  const system = `${ROLE}\n\n${guidance(req.decisionType)}\n\n${OUTPUT_CONTRACT}\n\n${afterContract(req.decisionType)}`;
   const user =
     `Decision type: ${req.decisionType}\n` +
     `Telemetry (JSON):\n${JSON.stringify(req.context, null, 2)}\n\n` +
