@@ -150,13 +150,18 @@ additionally dry-run validated on mainnet (dynamic tip from live floor, rotating
 blockhash + signature; only broadcast needs funding). ~180 Rust + 45 TS tests; CI runs fmt · clippy ·
 tests · schema-drift · TS typecheck + tests · dependency audit.
 
-**Final gated step — the funded mainnet proof run.** `./scripts/run-proof.sh` opens **one**
-Yellowstone stream, submits ≥10 bundles **including ≥2 deterministically-injected failures**
-(`--inject low-tip:1,stale-blockhash:1`), stream-confirms each lifecycle, persists the telemetry, and
-exports `logs/lifecycle-log.{json,md}` with explorer-verifiable slots. It needs a funded mainnet
-wallet (~$5–15 SOL in `wallets/payer.mainnet.json`) and Postgres up. It must be mainnet — Jito has no
-devnet Block Engine and the SolInfra stream is mainnet; the dry-run validates the same assembly path
-for free in the meantime.
+**Proven on mainnet — the funded proof run is committed.** `./scripts/run-proof.sh` opened **one**
+Yellowstone stream and submitted bundles **including ≥2 deterministically-injected failures**
+(`--inject low-tip:1,stale-blockhash:1`), stream-confirmed each lifecycle, persisted the telemetry, and
+exported [`logs/lifecycle-log.{json,md}`](logs/lifecycle-log.md). The committed run:
+**12 bundles landed, 2 failed of 14 submissions** — every landed bundle advancing
+`submitted→processed→confirmed→finalized`, slots **verifiable on the explorer** (e.g.
+[429547828](https://explorer.solana.com/block/429547828)), submit→confirmed deltas of **~0.45–1.7 s**,
+and **15 real AI decisions** (Groq `gpt-oss-120b`; 13 tip + 2 retry) in the log's AI Decision Timeline.
+Both injected faults — a sub-floor tip and an expired blockhash — were classified and **recovered to
+landing by the AI retry decision** (re-price / refresh + resubmit). It must be mainnet — Jito has no
+devnet Block Engine and the SolInfra stream is mainnet; the free dry-run validates the same assembly
+path without funds.
 
 ## README questions (answered from real telemetry)
 
@@ -171,11 +176,10 @@ contention, or congestion — it appears here *before* it shows up as outright f
 the network-health model tracks `confirm_latency_variance_ms` and folds it into the
 `congestion_score` the AI strategist reasons over.
 
-> Provenance: the **read-only engine** (no wallet/funding needed) streams this live against the
-> SolInfra mainnet feed — slot status advancing `processed → confirmed → finalized` and
-> stability/congestion reacting to real leader skips. Exact **per-bundle** submit→confirmed deltas
-> come from the funded proof run and will be committed to `logs/lifecycle-log.md` _(pending — see
-> Status)_; the figures here are illustrative until then.
+> Provenance: confirmed by the committed funded run — [`logs/lifecycle-log.md`](logs/lifecycle-log.md)
+> records real per-bundle submit→confirmed deltas of **~0.45–1.7 s** across 12 mainnet landings (small
+> and stable, exactly the healthy regime described above), each advancing
+> `processed → confirmed → finalized` with explorer-verifiable slots.
 
 **2. Why should you never use `finalized` commitment when fetching a blockhash for a time-sensitive transaction?**
 
@@ -200,10 +204,10 @@ policy encodes precisely this — `leader_miss` / `skipped_slot` are retryable, 
 from current conditions, and the blockhash is refreshed *only* when the window itself has closed
 (`prometheon-retry::policy`).
 
-> Provenance: while running the **read-only engine** against the live mainnet stream during
-> development we saw real leader skips move slot stability off `1.0` and the congestion score rise in
-> response. The committed skipped-slot / leader-miss telemetry with exact figures comes from the
-> funded proof run _(pending)_; treat the numbers above as illustrative until the log is published.
+> Provenance: the read-only engine streams real leader skips (slot stability moving off `1.0`, the
+> congestion score rising in response), and the committed funded run exercised the retry path for real —
+> both injected faults (a sub-floor tip, an expired blockhash) were classified and **recovered to
+> landing by the AI retry decision**, recorded in [`logs/lifecycle-log.md`](logs/lifecycle-log.md).
 
 ## License
 

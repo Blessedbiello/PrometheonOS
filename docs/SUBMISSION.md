@@ -12,8 +12,10 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
 - **Code (open source):** https://github.com/Blessedbiello/PrometheonOS
 - **Architecture document (public):** _‹paste Notion / Google-Docs URL here›_ — mirror of
   [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) + [`docs/DIAGRAMS.md`](DIAGRAMS.md).
-- **Lifecycle log:** [`logs/lifecycle-log.md`](../logs/lifecycle-log.md) (+ `.json`) — ≥10 real
-  mainnet bundles incl. ≥2 AI-recovered failures; slot numbers verifiable on the explorer.
+- **Lifecycle log:** [`logs/lifecycle-log.md`](../logs/lifecycle-log.md) (+ `.json`) — a committed
+  mainnet run: **12 bundles landed, 2 AI-recovered failures of 14 submissions**, each landed bundle
+  `submitted→processed→confirmed→finalized`; slot numbers verifiable on the explorer (e.g. block
+  [429547828](https://explorer.solana.com/block/429547828)).
 - **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
 
 ## Requirement → where it's satisfied
@@ -24,7 +26,7 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
 | Slot/leader monitoring via Yellowstone gRPC | `prometheon-ingest::yellowstone` — supervised `Subscribe`, reconnect w/ `from_slot` replay, drop-newest backpressure, keepalive/ping. |
 | Detect the correct leader window | `rpc::get_slot_leaders` (`getSlotLeaders`) + `leader::LeaderSchedule` (slots-until-rotation) → a live submission-timing decision. (Full Jito-leader classification needs the searcher gRPC + auth; documented.) |
 | Construct + submit Jito bundles | `prometheon-bundle` — co-located tip (no tip on a failed bundle), legacy tx (tip account never in an ALT), base64 `sendBundle`, region failover, ~1 rps pacing. |
-| Dynamic tips, no hardcoded values | tip from live `tip_floor` percentiles + congestion (`bundle::compute_tip`); the **AI** sets it per bundle; the core clamps to policy bounds (`proof::bounded_tip`). |
+| Dynamic tips, no hardcoded values | tip from live `tip_floor` percentiles + congestion (`bundle::compute_tip`); the **AI** sets it per bundle, reasoning over the live P50/P75/P95 distribution and targeting the competitive P75–P95 band (P50 sits at the Jito noise floor and rarely lands); the core clamps to a policy band with a competitive floor (`proof::apply_tip_policy`). |
 | Lifecycle Submitted→Processed→Confirmed→Finalized (+ ts/slots/deltas) | `prometheon-lifecycle` state machine; deltas + `processed→confirmed` consensus signal captured. |
 | Classify expired-blockhash / fee-too-low / compute-exceeded / bundle-failure | `prometheon-failure::classify` — signal-based, confidence + observable-vs-inferred grade (full 18-class taxonomy in `FAILURE-TAXONOMY.md`). |
 | Confirm landing via stream subscriptions | `prometheon-core::proof::PendingBundles` correlates our signatures to lifecycles via tx-status + slot-status; RPC is only a cross-check. |
@@ -61,16 +63,19 @@ cargo run -p prometheon-core --bin preflight           # connectivity ✓/✗
 # Free dry-run (no funds): validates the whole assembly path against live mainnet
 NETWORK=mainnet cargo run -p prometheon-core --bin proof -- --count 12
 
-# Live proof (funded wallet + agent running): the explorer-verifiable log + AI reasoning
-LLM_PROVIDER=anthropic pnpm --filter @prometheon/ai-agent start          # terminal 1
-NETWORK=mainnet LLM_PROVIDER=anthropic ./scripts/run-proof.sh 12 low-tip:1,stale-blockhash:1
+# Live proof (funded wallet + agent running): the explorer-verifiable log + AI reasoning.
+# The committed log was produced with Groq (any OpenAI-compatible host works; or anthropic/ollama):
+#   LLM_PROVIDER=openai OPENAI_BASE_URL=https://api.groq.com/openai/v1 OPENAI_MODEL=openai/gpt-oss-120b
+pnpm --filter @prometheon/ai-agent start                                 # terminal 1
+NETWORK=mainnet ./scripts/run-proof.sh 12 low-tip:1,stale-blockhash:1
 cargo run -p prometheon-telemetry --bin export-log     # → logs/lifecycle-log.{json,md}
 pnpm --filter @prometheon/dashboard dev                # http://localhost:3000 (live timeline)
 ```
 
 ## Why it should win (judging axes)
-- **Does It Work?** Real stack, stream-confirmed landings, successful **and** AI-recovered failures in
-  an explorer-verifiable log.
+- **Does It Work?** Real stack on **mainnet** — the committed run landed **12 bundles and AI-recovered
+  2 injected failures** (14 submissions), stream-confirmed through `finalized`, in an explorer-verifiable
+  log.
 - **Depth of Integration.** No hardcoded shortcuts — live tip floor, dynamic CU, correct commitment
   handling, stream-confirmed landing, real leader schedule, co-located no-ALT tip.
 - **AI Demonstration.** The agent drives recovery *during the run* — it prices the tip and chooses

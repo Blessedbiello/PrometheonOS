@@ -1,0 +1,540 @@
+[
+  {
+    "bundle_id": "0657d3c1fe6adb9765827870c5eecbe0f0c427b3fbd670824e05e61f2c7378e3",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "2S4Gfksgidh2166xceQzFAHpB2RpV4ov4pkFn4mdtCCYzAFQRfSfWmjXY56c3Z8QpQVr3AqDxANv53YBx9TFw75r"
+    ],
+    "submitted_ts": "2026-06-28T23:16:21.640131224Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:21.640131224Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547860,
+        "ts": "2026-06-28T23:16:22.895046402Z",
+        "delta_ms": 1254
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547860,
+        "ts": "2026-06-28T23:16:22.895209506Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547860,
+        "ts": "2026-06-28T23:16:34.534521106Z",
+        "delta_ms": 11639
+      }
+    ],
+    "first_slot": 429547860,
+    "confirmed_latency_ms": 1254,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "0aaccb6cea6fdae5af9da4f8e35aeeff64b70cb6fe842d86ce2f937d5da3fa67",
+    "tip_lamports": 200000,
+    "tip_account": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "region": "ny",
+    "signatures": [
+      "2TZKNHKnYPNhoHc1p3CDyJEqcQ3QZG5HFxuNQtdRmzmGKn2jJ2GS9xZ4H35mYjW5hLuaw62AnKnRskG3S8aztsok"
+    ],
+    "submitted_ts": "2026-06-28T23:18:09.783684754Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:18:09.783684754Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429548126,
+        "ts": "2026-06-28T23:18:10.279007872Z",
+        "delta_ms": 495
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429548126,
+        "ts": "2026-06-28T23:18:10.279079896Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429548126,
+        "ts": "2026-06-28T23:18:23.384917528Z",
+        "delta_ms": 13105
+      }
+    ],
+    "first_slot": 429548126,
+    "confirmed_latency_ms": 495,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "40d37176be6988d8e597be2cf9998221ae2a5f9b5b34e7ae910d3a91b666f325",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "4CWEonfULuYhiaCs3uJKYusTD9DBdgXKvfZYFUHTVq5GU3yoKqbmF7UaKKzSrhFS4tY42yLpLYsxTJ5mDG7L58yH"
+    ],
+    "submitted_ts": "2026-06-28T23:16:40.380114178Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:40.380114178Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547908,
+        "ts": "2026-06-28T23:16:42.043037965Z",
+        "delta_ms": 1662
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547908,
+        "ts": "2026-06-28T23:16:42.043093554Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547908,
+        "ts": "2026-06-28T23:16:53.921462694Z",
+        "delta_ms": 11878
+      }
+    ],
+    "first_slot": 429547908,
+    "confirmed_latency_ms": 1662,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "580ab841e6bce042cc05f1607607817908daefa57d32e268190567dc611d2080",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "3TiQGkJTD9kk29TiPnSpKkud5Y6MFyy5WCUP1wTwY23zUULB3gdGyVyaSURUwmAbMjZsJWfumbUyAFDuPaojxV4t"
+    ],
+    "submitted_ts": "2026-06-28T23:16:49.361560724Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:49.361560724Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547928,
+        "ts": "2026-06-28T23:16:49.817007869Z",
+        "delta_ms": 455
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547928,
+        "ts": "2026-06-28T23:16:49.817178620Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547928,
+        "ts": "2026-06-28T23:17:01.806178855Z",
+        "delta_ms": 11989
+      }
+    ],
+    "first_slot": 429547928,
+    "confirmed_latency_ms": 455,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "5MphXk2z19dcjVSmKZ2txP235UEpRkh1bKAuDV5oMqLo1EzKBV4HRaTm8fRk3SX4zXQYFMEMLZD6PESty8Uaepuj",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "5MphXk2z19dcjVSmKZ2txP235UEpRkh1bKAuDV5oMqLo1EzKBV4HRaTm8fRk3SX4zXQYFMEMLZD6PESty8Uaepuj"
+    ],
+    "submitted_ts": "2026-06-28T23:18:02.835394554Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:18:02.835394554Z",
+        "delta_ms": null
+      }
+    ],
+    "first_slot": null,
+    "confirmed_latency_ms": null,
+    "final_stage": "submitted",
+    "failure_class": "bundle_failure",
+    "failure_confidence": 0.85
+  },
+  {
+    "bundle_id": "6fb748fccb8ba546d18764ae9f2e98e2227bc6660e7694c31f827dc52ce3aca6",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "4EyZ7awJ366myQbsFP41Ks61jSE9oAipEotJgpzRFbeotEFKcEopjFNzbbXo333a28py3DnVn4LzekgPSXw9SrE9"
+    ],
+    "submitted_ts": "2026-06-28T23:16:09.345851928Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:09.345851928Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547828,
+        "ts": "2026-06-28T23:16:09.946337382Z",
+        "delta_ms": 600
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547828,
+        "ts": "2026-06-28T23:16:09.946393908Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547828,
+        "ts": "2026-06-28T23:16:22.204866774Z",
+        "delta_ms": 12258
+      }
+    ],
+    "first_slot": 429547828,
+    "confirmed_latency_ms": 600,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "7d2bd816ea434b004b55a39c441eec530201604cd48437aa118f6555cc6671ee",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "5Su46vtq8v4pHh5rbtr2YG1tCGWjCExfH8Z433iqWHGL9Z8hgDkojawhZhjDBKbLpSNE1QuS8jyAoa3pxHRDkWTM"
+    ],
+    "submitted_ts": "2026-06-28T23:16:27.847377637Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:27.847377637Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547875,
+        "ts": "2026-06-28T23:16:28.684244400Z",
+        "delta_ms": 836
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547875,
+        "ts": "2026-06-28T23:16:28.684303163Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547875,
+        "ts": "2026-06-28T23:16:41.002798926Z",
+        "delta_ms": 12318
+      }
+    ],
+    "first_slot": 429547875,
+    "confirmed_latency_ms": 836,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "88afc4ea6ac8056ccaea78496d36115c7748b9b12d83d884578416a67e9a22d5",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "3RG9zrs1PKRnxJ3mNvFSeQe3seDtg8pNsDzFKTN6Hibj3Y5PrUVXTKWRJjGEFd4bPqxBmM4Vfpms9n8QJLjMuCt9"
+    ],
+    "submitted_ts": "2026-06-28T23:16:32.464963414Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:32.464963414Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547887,
+        "ts": "2026-06-28T23:16:33.239402387Z",
+        "delta_ms": 774
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547887,
+        "ts": "2026-06-28T23:16:33.239459895Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547887,
+        "ts": "2026-06-28T23:16:45.913332629Z",
+        "delta_ms": 12673
+      }
+    ],
+    "first_slot": 429547887,
+    "confirmed_latency_ms": 774,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "8d5fc772d979980cae70c29e701c83ef447232d588c30a91b89b96c25bf37ed4",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "4QpnTvqENJZ3kztmn3CSdxg7Rwb46GgPk4KQoKfym2PdiZ2aKePnU48kHdN5NDrkg76hTmcSTa8hd5ftVGtcaYy6"
+    ],
+    "submitted_ts": "2026-06-28T23:16:44.911554117Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:44.911554117Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547916,
+        "ts": "2026-06-28T23:16:45.363096569Z",
+        "delta_ms": 451
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547916,
+        "ts": "2026-06-28T23:16:45.363168671Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547916,
+        "ts": "2026-06-28T23:16:57.203022137Z",
+        "delta_ms": 11839
+      }
+    ],
+    "first_slot": 429547916,
+    "confirmed_latency_ms": 451,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "98ec1ae6e9e3588ef222b43205a7b43d9a6eadfb25de75254a21082852202c17",
+    "tip_lamports": 200000,
+    "tip_account": "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "region": "ny",
+    "signatures": [
+      "S1F4gR9BNYBbagH5MpDkkK8A7VxjDson5UCJRofRb6JLpKTXBoJJpW4dCVVUk2ss5BWvVxNDpbN3rKz6eXY8jon"
+    ],
+    "submitted_ts": "2026-06-28T23:18:16.465107209Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:18:16.465107209Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429548143,
+        "ts": "2026-06-28T23:18:16.983815532Z",
+        "delta_ms": 518
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429548143,
+        "ts": "2026-06-28T23:18:16.983883476Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429548143,
+        "ts": "2026-06-28T23:18:30.585555290Z",
+        "delta_ms": 13601
+      }
+    ],
+    "first_slot": 429548143,
+    "confirmed_latency_ms": 518,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "9bacef1465acbe7e5c7e441ab72236f69f402c51c5634da299f95d335a8e3578",
+    "tip_lamports": 1000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "32DZi1EKjaGtWGEKYBLRQ1DXfRTUocBH9jEfjjBQ3N4yqhkwgDcYM944s9tTUQLzMMXpygFk4eFDMZDKsqtvX216"
+    ],
+    "submitted_ts": "2026-06-28T23:16:53.921382517Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:53.921382517Z",
+        "delta_ms": null
+      }
+    ],
+    "first_slot": null,
+    "confirmed_latency_ms": null,
+    "final_stage": "submitted",
+    "failure_class": "bundle_failure",
+    "failure_confidence": 0.85
+  },
+  {
+    "bundle_id": "df5cadbc864a11378a18b9675586ec2e74ff7a876623dc30ee0ca98503cfeaf5",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "KAzxDifodBseDDaEreN2M1kRwhtRyUEaCGa9YT4C5QS999YsGieVPCbaQ3Gittk3MF8hripU3JLLLbAa4Efaebv"
+    ],
+    "submitted_ts": "2026-06-28T23:16:17.638210062Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:17.638210062Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547850,
+        "ts": "2026-06-28T23:16:18.874869385Z",
+        "delta_ms": 1236
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547850,
+        "ts": "2026-06-28T23:16:18.875031386Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547850,
+        "ts": "2026-06-28T23:16:30.842021321Z",
+        "delta_ms": 11966
+      }
+    ],
+    "first_slot": 429547850,
+    "confirmed_latency_ms": 1236,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "e1f07683869108c99f952ff583d88a6a7607be9d8e4289924ec6682a96553c53",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "4SCxFReC4F6ft9Mxc4bxQMyNbH8SUMJH3Chac1MxWRMfn4831oXqDhoSyAwwTdzdLQJcmtvh8f8nKTzysggpFwAk"
+    ],
+    "submitted_ts": "2026-06-28T23:16:13.358839664Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:13.358839664Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547838,
+        "ts": "2026-06-28T23:16:14.088678162Z",
+        "delta_ms": 729
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547838,
+        "ts": "2026-06-28T23:16:14.088754582Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547838,
+        "ts": "2026-06-28T23:16:26.171622691Z",
+        "delta_ms": 12082
+      }
+    ],
+    "first_slot": 429547838,
+    "confirmed_latency_ms": 729,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  },
+  {
+    "bundle_id": "ef7e786f1d05c1df3b4642ee1a6f4fb4e642cfe7ba48c3465cd4fddefcd20878",
+    "tip_lamports": 200000,
+    "tip_account": "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "region": "ny",
+    "signatures": [
+      "2TAdiByHhAL6FuBDxMKdV5c1MwGXjiCRirHXnJbSvLNQ42KwQCuKNCiskwSJyYf5bvHh51mUizQup8RM5C1upkfE"
+    ],
+    "submitted_ts": "2026-06-28T23:16:36.411997375Z",
+    "stages": [
+      {
+        "stage": "submitted",
+        "slot": null,
+        "ts": "2026-06-28T23:16:36.411997375Z",
+        "delta_ms": null
+      },
+      {
+        "stage": "processed",
+        "slot": 429547897,
+        "ts": "2026-06-28T23:16:37.332971305Z",
+        "delta_ms": 920
+      },
+      {
+        "stage": "confirmed",
+        "slot": 429547897,
+        "ts": "2026-06-28T23:16:37.333030004Z",
+        "delta_ms": 0
+      },
+      {
+        "stage": "finalized",
+        "slot": 429547897,
+        "ts": "2026-06-28T23:16:49.722924094Z",
+        "delta_ms": 12389
+      }
+    ],
+    "first_slot": 429547897,
+    "confirmed_latency_ms": 920,
+    "final_stage": "finalized",
+    "failure_class": null,
+    "failure_confidence": null
+  }
+]
