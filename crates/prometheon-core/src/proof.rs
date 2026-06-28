@@ -50,9 +50,14 @@ pub fn priority_cu_price_micro(congestion: f64) -> u64 {
 /// from live floor data, never hardcoded). Floor at the 1000-lamport Jito minimum.
 pub fn default_tip_strategy() -> TipStrategy {
     TipStrategy {
-        target: Percentile::P50,
+        // Target P95: the landed-tip distribution is heavily skewed and the floor endpoint is volatile
+        // (P50/P75 routinely collapse to the ~1000-lamport Jito noise floor minute-to-minute). Anchor
+        // on P95 and enforce a competitive safety floor (`min_lamports`) so a bundle reliably wins
+        // inclusion even when the live floor momentarily reads near-zero. The deterministic core thus
+        // *guarantees* a landing-grade tip; the AI proposes within this band.
+        target: Percentile::P95,
         congestion_boost: 0.5,
-        min_lamports: 1_000,
+        min_lamports: 200_000,
         max_lamports: 1_000_000,
     }
 }
@@ -62,6 +67,18 @@ pub fn default_tip_strategy() -> TipStrategy {
 /// (or under-tip below the Jito minimum). Defense-in-depth against decision poisoning.
 pub fn bounded_tip(resolved_lamports: u64, strategy: &TipStrategy) -> u64 {
     resolved_lamports.clamp(strategy.min_lamports, strategy.max_lamports)
+}
+
+/// Apply the tip policy to a resolved tip. Normally this is the full `[min, max]` clamp. When
+/// `bypass_clamp` is set — used **only** for the low-tip fault injection — only the absurd-high cap
+/// applies, so the deliberately sub-floor fault tip is honored (not raised to the competitive
+/// `min_lamports`, which would defeat the injection and make it land).
+pub fn apply_tip_policy(resolved_lamports: u64, bypass_clamp: bool, strategy: &TipStrategy) -> u64 {
+    if bypass_clamp {
+        resolved_lamports.min(strategy.max_lamports)
+    } else {
+        bounded_tip(resolved_lamports, strategy)
+    }
 }
 
 /// A fully-assembled, signed attempt ready to simulate or submit.
@@ -81,9 +98,14 @@ pub struct AttemptPlan {
 
 /// Assemble + sign one attempt against live data. No broadcast — caller chooses simulate vs submit.
 ///
-/// `tip_override` forces a specific tip (used by fault injection to submit a deliberately sub-floor
-/// tip); `blockhash_override` substitutes a caller-supplied blockhash (used to submit on a
+/// `tip_override` forces a specific tip (the AI-chosen tip in the live path, or a fault-injection
+/// value); `blockhash_override` substitutes a caller-supplied blockhash (used to submit on a
 /// deliberately stale/expired one). Both `None` for a normal attempt.
+///
+/// `bypass_tip_clamp` skips the `[min_lamports, max_lamports]` policy clamp (capping only the
+/// absurd-high side). It is set **only** for the low-tip fault injection, whose whole purpose is to
+/// submit a deliberately sub-floor tip that must NOT be raised to the competitive minimum. A normal
+/// or AI-chosen tip is always clamped to the policy band.
 #[allow(clippy::too_many_arguments)]
 pub async fn prepare_attempt(
     rpc: &RpcClient,
@@ -94,6 +116,7 @@ pub async fn prepare_attempt(
     attempt: u32,
     transfer_lamports: u64,
     tip_override: Option<u64>,
+    bypass_tip_clamp: bool,
     blockhash_override: Option<crate::rpc::BlockhashInfo>,
 ) -> anyhow::Result<AttemptPlan> {
     let bh = match blockhash_override {
@@ -109,12 +132,14 @@ pub async fn prepare_attempt(
 
     let strategy = default_tip_strategy();
     let fallback = compute_tip(&floor, &strategy, congestion);
-    // Resolve the tip (injection override → AI decision → live-data fallback), then clamp it to the
-    // policy bounds so a malformed/poisoned decision can never make us overpay or under-tip below the
-    // Jito minimum.
+    // Resolve the tip: explicit override (AI-chosen tip or fault value) → AI decision → live-data
+    // fallback. Then clamp to the policy band — UNLESS this is the low-tip fault (`bypass_tip_clamp`),
+    // which must stay deliberately sub-floor to guarantee a non-landing (clamping it up to the
+    // competitive `min_lamports` would defeat the fault). The clamp still protects every normal/AI
+    // tip from a malformed/poisoned decision overpaying or under-tipping below the competitive floor.
     let resolved =
         tip_override.unwrap_or_else(|| resolve_tip(decision.as_ref(), fallback.lamports));
-    let tip_lamports = bounded_tip(resolved, &strategy);
+    let tip_lamports = apply_tip_policy(resolved, bypass_tip_clamp, &strategy);
     let cu_price_micro = priority_cu_price_micro(congestion);
 
     let params = BundleParams {
@@ -292,10 +317,24 @@ mod tests {
 
     #[test]
     fn ai_tip_is_clamped_to_policy_bounds() {
-        let s = default_tip_strategy(); // min 1_000, max 1_000_000
-        assert_eq!(bounded_tip(50, &s), 1_000); // absurdly low → floored at Jito minimum
+        let s = default_tip_strategy(); // min 200_000 (competitive floor), max 1_000_000
+                                        // A near-noise-floor tip is raised to the competitive minimum so the bundle reliably lands
+                                        // (the landed-tip distribution is skewed; P50 sits at the ~1000-lamport Jito floor).
+        assert_eq!(bounded_tip(50, &s), 200_000);
         assert_eq!(bounded_tip(5_000_000, &s), 1_000_000); // absurdly high → capped
-        assert_eq!(bounded_tip(14_500, &s), 14_500); // within range → untouched
+        assert_eq!(bounded_tip(300_000, &s), 300_000); // within range → untouched
+    }
+
+    #[test]
+    fn injected_low_tip_bypasses_the_competitive_floor() {
+        let s = default_tip_strategy(); // min 200_000, max 1_000_000
+                                        // Normal/AI tip: clamped UP to the competitive floor so the bundle lands.
+        assert_eq!(apply_tip_policy(1_000, false, &s), 200_000);
+        // Low-tip fault (bypass): the deliberately sub-floor tip is honored, guaranteeing a
+        // non-landing — it must NOT be raised to the floor.
+        assert_eq!(apply_tip_policy(1_000, true, &s), 1_000);
+        // Even with bypass, an absurd-high tip is still capped (no accidental overpay).
+        assert_eq!(apply_tip_policy(5_000_000, true, &s), 1_000_000);
     }
 
     #[test]

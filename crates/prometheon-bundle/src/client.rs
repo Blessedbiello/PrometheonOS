@@ -143,6 +143,11 @@ impl BlockEngineClient {
                     }
                     last_status = status;
                     if !is_retryable_status(status) {
+                        // Surface the JSON-RPC error body — the *reason* for the rejection (e.g.
+                        // expired blockhash, sanitize failure). Without this the caller only sees a
+                        // bare status code and can't classify or debug the failure.
+                        let body = resp.text().await.unwrap_or_default();
+                        tracing::warn!(status, %method, region = %region, body = %body, "jito rpc rejected (non-retryable)");
                         return Err(JitoError::AllRegionsFailed(status));
                     }
                     // retryable → fall through to next region

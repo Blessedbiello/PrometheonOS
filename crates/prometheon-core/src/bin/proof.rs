@@ -182,9 +182,13 @@ async fn main() -> anyhow::Result<()> {
     let floor = jito.get_tip_floor().await?;
     let congestion = congestion_proxy(&floor);
     let floor_p50 = floor.percentile_lamports(Percentile::P50);
+    let floor_p75 = floor.percentile_lamports(Percentile::P75);
+    let floor_p95 = floor.percentile_lamports(Percentile::P95);
     println!(
-        "tip floor p50={} ema50={} lamports -> congestion≈{:.3}\n",
+        "tip floor p50={} p75={} p95={} ema50={} lamports -> congestion≈{:.3}\n",
         floor_p50,
+        floor_p75,
+        floor_p95,
         floor.ema50_lamports(),
         congestion
     );
@@ -214,6 +218,8 @@ async fn main() -> anyhow::Result<()> {
             congestion,
             transfer,
             floor_p50,
+            floor_p75,
+            floor_p95,
             &injections,
         )
         .await
@@ -250,6 +256,7 @@ async fn run_dry(
             attempt,
             transfer,
             tip_override,
+            matches!(inj, Some(FaultScenario::LowTip { .. })),
             None,
         )
         .await?;
@@ -353,7 +360,11 @@ impl Submitter for LiveSubmitter {
                 // Honor the retry policy's refresh flag: when a refresh is NOT required (e.g. a
                 // fee-too-low retry while the blockhash is still valid), reuse the base's cached
                 // blockhash and only re-price; otherwise fetch a fresh one (override = None).
-                let reuse = if spec.refresh_blockhash {
+                // BUT a non-refresh retry can land here long after the first attempt (the saga waits
+                // a full give-up window for landing before retrying), by which point the cached
+                // blockhash may have expired — reusing it then guarantees a Jito "expired blockhash"
+                // 400. So reuse only if it's still valid on-chain; otherwise fall back to a fresh one.
+                let cached = if spec.refresh_blockhash {
                     None
                 } else {
                     self.blockhash_cache
@@ -361,6 +372,13 @@ impl Submitter for LiveSubmitter {
                         .await
                         .get(&spec.base_id)
                         .cloned()
+                };
+                let reuse = match cached {
+                    Some(b) => match self.rpc.is_blockhash_valid(&b.blockhash).await {
+                        Ok(true) => Some(b),
+                        _ => None, // stale/unknown → fetch fresh
+                    },
+                    None => None,
                 };
                 (spec.tip_lamports, reuse, 150)
             }
@@ -374,6 +392,9 @@ impl Submitter for LiveSubmitter {
             spec.attempt_no,
             self.transfer,
             tip_override,
+            // Only the low-tip fault bypasses the competitive clamp; the AI/normal tip (also passed as
+            // `tip_override`) must be clamped to the policy band so it lands.
+            matches!(spec.injected, Some(FaultScenario::LowTip { .. })),
             bh_override,
         )
         .await?;
@@ -488,6 +509,8 @@ async fn run_live(
     congestion: f64,
     transfer: u64,
     floor_p50: u64,
+    floor_p75: u64,
+    floor_p95: u64,
     injections: &[Option<FaultScenario>],
 ) -> anyhow::Result<()> {
     // Telemetry sinks — the SAME emitter the engine uses, so export-log reads what we persist.
@@ -583,7 +606,15 @@ async fn run_live(
     };
 
     // One logical bundle per attempt slot; injected faults sit on the LAST attempts (set up earlier).
-    let base_ctx = json!({ "congestionScore": congestion, "tipFloorP50Lamports": floor_p50 });
+    // Give the strategist the full landed-tip distribution, not just P50. The distribution is heavily
+    // skewed — P50 sits at the ~1000-lamport Jito noise floor, so tipping at P50 rarely wins
+    // inclusion; the P75–P95 band is where bundles reliably land. The agent reasons over all three.
+    let base_ctx = json!({
+        "congestionScore": congestion,
+        "tipFloorP50Lamports": floor_p50,
+        "tipFloorP75Lamports": floor_p75,
+        "tipFloorP95Lamports": floor_p95,
+    });
     let bases: Vec<BaseBundle> = injections
         .iter()
         .enumerate()

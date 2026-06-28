@@ -271,10 +271,18 @@ pub async fn fetch_decisions(pool: &sqlx::PgPool) -> anyhow::Result<Vec<Value>> 
 
 async fn fetch_payloads(pool: &sqlx::PgPool, kind: &str) -> anyhow::Result<Vec<Value>> {
     // Cast jsonb → text so we don't need sqlx's json feature; parse in Rust.
+    // Optional run scoping: EXPORT_SINCE_ID limits the export to rows newer than a captured watermark
+    // (max(id) taken just before a proof run), so a single run exports cleanly even when the telemetry
+    // table also retains rows from earlier runs. Unset (0) ⇒ export the full history, as before.
+    let since_id: i64 = std::env::var("EXPORT_SINCE_ID")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
     let rows = sqlx::query(
-        "SELECT payload::text AS p FROM telemetry_event WHERE kind = $1 ORDER BY recorded_at",
+        "SELECT payload::text AS p FROM telemetry_event WHERE kind = $1 AND id > $2 ORDER BY recorded_at",
     )
     .bind(kind)
+    .bind(since_id)
     .fetch_all(pool)
     .await?;
     let mut out = Vec::with_capacity(rows.len());
