@@ -27,7 +27,9 @@ export function providerFromEnv(env: Env = process.env): LlmProvider {
     case "openai": {
       const key = env.OPENAI_API_KEY;
       if (!key) throw new Error("LLM_PROVIDER=openai requires OPENAI_API_KEY");
-      return new OpenAiProvider(key, env.OPENAI_MODEL ?? "gpt-4.1");
+      // OPENAI_BASE_URL targets any OpenAI-compatible endpoint (Nosana inference, vLLM, Together,
+      // Groq, …); unset → api.openai.com.
+      return new OpenAiProvider(key, env.OPENAI_MODEL ?? "gpt-4.1", env.OPENAI_BASE_URL);
     }
     case "ollama":
       return new OllamaProvider(env.OLLAMA_BASE_URL, env.OLLAMA_MODEL);

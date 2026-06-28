@@ -22,8 +22,11 @@ function guidance(decisionType: DecisionType): string {
     case "tip":
       return (
         "Decide the Jito tip (lamports) for the next bundle. Balance cost against landing " +
-        "probability using the tip-floor percentiles and the congestion score. Never hardcode; " +
-        "derive the tip from the live floor."
+        "probability using the tip-floor percentiles and the congestion score. The landed-tip " +
+        "distribution is heavily skewed: tipFloorP50Lamports sits at the ~1000-lamport Jito noise " +
+        "floor, so tipping near P50 rarely wins inclusion. To land reliably, anchor on the P75–P95 " +
+        "band (tipFloorP75Lamports..tipFloorP95Lamports), leaning toward P95 as congestion rises. " +
+        "Never hardcode; derive the tip from the live floor."
       );
     case "timing":
       return (

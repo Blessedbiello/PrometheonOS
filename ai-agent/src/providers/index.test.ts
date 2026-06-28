@@ -20,6 +20,16 @@ describe("providerFromEnv", () => {
     expect(providerFromEnv({ LLM_PROVIDER: "ollama" }).name).toBe("ollama");
   });
 
+  it("selects openai against an OpenAI-compatible base URL (e.g. Nosana inference / vLLM)", () => {
+    const p = providerFromEnv({
+      LLM_PROVIDER: "openai",
+      OPENAI_API_KEY: "nosana-key",
+      OPENAI_BASE_URL: "https://job.example.node.k8s.prd.nos.ci/v1",
+      OPENAI_MODEL: "llama-3.1-8b-instruct",
+    });
+    expect(p.name).toBe("openai");
+  });
+
   it("throws when the required API key is missing", () => {
     expect(() => providerFromEnv({ LLM_PROVIDER: "anthropic" })).toThrow();
     expect(() => providerFromEnv({ LLM_PROVIDER: "openai" })).toThrow();
