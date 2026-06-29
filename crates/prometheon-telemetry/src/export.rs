@@ -22,6 +22,13 @@ pub struct StageRow {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LifecycleLogEntry {
     pub bundle_id: String,
+    /// The logical bundle this attempt belongs to (retries share a `base_id`) — drives the recovery
+    /// chains that thread a failed attempt to its recovered resubmission.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_id: Option<String>,
+    /// 1-indexed attempt number within `base_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
     pub tip_lamports: u64,
     pub tip_account: String,
     pub region: String,
@@ -40,6 +47,8 @@ impl LifecycleLogEntry {
     fn new(bundle_id: String) -> Self {
         Self {
             bundle_id,
+            base_id: None,
+            attempt: None,
             tip_lamports: 0,
             tip_account: String::new(),
             region: String::new(),
@@ -100,6 +109,12 @@ pub fn build_log(
         if e.submitted_ts.is_empty() {
             e.submitted_ts = b["ts"].as_str().unwrap_or_default().to_string();
         }
+        if e.base_id.is_none() {
+            e.base_id = b["base_id"].as_str().map(String::from);
+        }
+        if e.attempt.is_none() {
+            e.attempt = b["attempt"].as_u64().map(|n| n as u32);
+        }
     }
 
     for l in lifecycles {
@@ -155,6 +170,89 @@ fn explorer_block(base: &str, slot: i64) -> String {
     format!("[{slot}]({base}/block/{slot})")
 }
 
+fn short_sig(sig: &str) -> String {
+    if sig.len() > 12 {
+        format!("{}…{}", &sig[..6], &sig[sig.len() - 4..])
+    } else {
+        sig.to_string()
+    }
+}
+
+/// Thread each failed attempt to its recovered resubmission — the **AI recovery unit**. A chain is a
+/// logical bundle (`base_id`) whose final attempt LANDED while an earlier attempt did NOT, i.e. the AI
+/// retry decision recovered it. Returns markdown (empty if there were no recoveries). This is the
+/// bounty's headline evidence made legible: failure → real-signal classification → AI retry decision →
+/// finalized, explorer-verifiable landing — cross-referenceable instead of inferred from timestamps.
+fn render_recovery_chains(entries: &[LifecycleLogEntry], explorer_base: &str) -> String {
+    use std::collections::BTreeMap;
+    let mut by_base: BTreeMap<&str, Vec<&LifecycleLogEntry>> = BTreeMap::new();
+    for e in entries {
+        if let Some(base) = e.base_id.as_deref() {
+            by_base.entry(base).or_default().push(e);
+        }
+    }
+    let mut chains: Vec<(&str, Vec<&LifecycleLogEntry>)> = Vec::new();
+    for (base, mut group) in by_base {
+        if group.len() < 2 {
+            continue; // no retry happened → not a recovery chain
+        }
+        group.sort_by_key(|e| e.attempt.unwrap_or(0));
+        let last_landed = group.last().map(|e| e.landed()).unwrap_or(false);
+        let earlier_failed = group[..group.len() - 1].iter().any(|e| !e.landed());
+        if last_landed && earlier_failed {
+            chains.push((base, group));
+        }
+    }
+    if chains.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    out.push_str(&format!(
+        "## AI Recovery Chains\n\n{} injected failure{} recovered to a **finalized landing on retry**. \
+         Each chain threads a failed attempt → its real-signal classification → the recovered \
+         resubmission; the retry decision that drove it (and its provider — AI agent or deterministic \
+         fallback) is in the **AI Decision Timeline** below.\n\n",
+        chains.len(),
+        if chains.len() == 1 { "" } else { "s" },
+    ));
+    for (base, group) in &chains {
+        out.push_str(&format!("**Logical bundle `{base}`**\n\n"));
+        for e in group {
+            let attempt = e.attempt.unwrap_or(0);
+            let sig = e.signatures.first().map(String::as_str).unwrap_or("");
+            if e.landed() {
+                let slot = e
+                    .first_slot
+                    .map(|s| explorer_block(explorer_base, s))
+                    .unwrap_or_else(|| "—".into());
+                let latency = e
+                    .confirmed_latency_ms
+                    .map(|ms| format!(", Δ {ms} ms"))
+                    .unwrap_or_default();
+                let stage = e.final_stage.as_deref().unwrap_or("landed");
+                out.push_str(&format!(
+                    "- attempt {attempt} · tip {} · sig `{}` → **LANDED** {slot} ({stage}{latency})\n",
+                    e.tip_lamports,
+                    short_sig(sig),
+                ));
+            } else {
+                let class = e.failure_class.as_deref().unwrap_or("non-landing");
+                let conf = e
+                    .failure_confidence
+                    .map(|c| format!(" (conf {c:.2})"))
+                    .unwrap_or_default();
+                out.push_str(&format!(
+                    "- attempt {attempt} · tip {} · sig `{}` → classified `{class}`{conf} → AI retry decision ↓\n",
+                    e.tip_lamports,
+                    short_sig(sig),
+                ));
+            }
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// Render the lifecycle log as submission-ready markdown with explorer links.
 pub fn render_markdown(entries: &[LifecycleLogEntry], explorer_base: &str) -> String {
     let landed = entries.iter().filter(|e| e.landed()).count();
@@ -166,6 +264,9 @@ pub fn render_markdown(entries: &[LifecycleLogEntry], explorer_base: &str) -> St
         "{} bundles · {landed} landed · {failed} failed. Slot numbers are verifiable on the Solana explorer.\n\n",
         entries.len()
     ));
+    // Lead with the AI recovery chains (empty for runs with no recovery) so the failure→recover→land
+    // story is the first thing a reader sees, above the full per-attempt table.
+    out.push_str(&render_recovery_chains(entries, explorer_base));
     out.push_str(
         "| # | Bundle | Tip (lamports) | First slot | Progression | Submit→Confirmed | Failure |\n",
     );
@@ -230,10 +331,33 @@ pub fn render_decisions_markdown(decisions: &[Value]) -> String {
         out.push_str("_No AI decisions were recorded for this run._\n");
         return out;
     }
-    out.push_str(&format!(
-        "{} AI decisions recorded during the run (the agent owns the tip + autonomous-retry decisions).\n\n",
-        decisions.len()
-    ));
+    // Be honest about provenance: count how many decisions the live AI agent actually made vs. how
+    // many fell back to the deterministic policy (agent unavailable). Never claim "the agent owns the
+    // tip" on a run where it didn't.
+    let total = decisions.len();
+    let fallback = decisions
+        .iter()
+        .filter(|d| d["provider"].as_str() == Some("policy-fallback"))
+        .count();
+    let ai = total - fallback;
+    let header = if fallback == 0 {
+        format!(
+            "{total} decisions recorded during the run, all by the **AI agent** — it proposes the tip and \
+             owns the autonomous-retry decision (the deterministic core clamps each tip to the competitive \
+             floor; provider is shown per entry).\n\n"
+        )
+    } else if ai == 0 {
+        format!(
+            "{total} decisions recorded during the run, **all by the deterministic policy fallback** (the \
+             AI agent was unavailable); provider is shown per entry.\n\n"
+        )
+    } else {
+        format!(
+            "{total} decisions recorded during the run: **{ai} by the AI agent**, {fallback} by the \
+             deterministic policy fallback; provider is shown per entry.\n\n"
+        )
+    };
+    out.push_str(&header);
     for (i, d) in decisions.iter().enumerate() {
         let dtype = d["decision_type"].as_str().unwrap_or("?");
         let action = d["action"].as_str().unwrap_or("");
@@ -346,6 +470,37 @@ mod tests {
         assert!(md.contains("https://explorer.solana.com/block/425000100"));
         assert!(md.contains("submitted→processed→confirmed"));
         assert!(md.contains("expired_blockhash"));
+        // No base_id linkage and B2 is a terminal failure → no recovery chain section.
+        assert!(!md.contains("AI Recovery Chains"));
+    }
+
+    #[test]
+    fn recovery_chains_thread_a_failed_attempt_to_its_landed_resubmission() {
+        // base "b11": attempt 1 (sub-floor tip) → fee_too_low; attempt 2 (competitive tip) → finalized.
+        let bundles = vec![
+            json!({"kind":"bundle","bundle_id":"a1id","base_id":"b11","attempt":1,"tip_lamports":1000,"tip_account":"T","region":"ny","signatures":["sigFailAttempt"],"phase":"submitted","ts":"2026-06-29T00:00:00.000Z"}),
+            json!({"kind":"bundle","bundle_id":"a2id","base_id":"b11","attempt":2,"tip_lamports":200000,"tip_account":"T","region":"ny","signatures":["sigLandedAttempt"],"phase":"submitted","ts":"2026-06-29T00:01:00.000Z"}),
+        ];
+        let lifecycles = vec![
+            json!({"kind":"lifecycle","id":"a2id","event":{"stage":"submitted","slot":null,"ts":"2026-06-29T00:01:00.000Z","delta_ms_from_prev":null}}),
+            json!({"kind":"lifecycle","id":"a2id","event":{"stage":"processed","slot":429560473,"ts":"2026-06-29T00:01:00.400Z","delta_ms_from_prev":400}}),
+            json!({"kind":"lifecycle","id":"a2id","event":{"stage":"confirmed","slot":429560473,"ts":"2026-06-29T00:01:00.800Z","delta_ms_from_prev":400}}),
+            json!({"kind":"lifecycle","id":"a2id","event":{"stage":"finalized","slot":429560473,"ts":"2026-06-29T00:01:13.000Z","delta_ms_from_prev":12200}}),
+        ];
+        let failures = vec![
+            json!({"kind":"failure","id":"a1id","classification":{"class":"fee_too_low","confidence":0.84}}),
+        ];
+        let log = build_log(&bundles, &lifecycles, &failures);
+        let a1 = log.iter().find(|e| e.bundle_id == "a1id").unwrap();
+        assert_eq!(a1.base_id.as_deref(), Some("b11"));
+        assert_eq!(a1.attempt, Some(1));
+
+        let md = render_markdown(&log, "https://explorer.solana.com");
+        assert!(md.contains("AI Recovery Chains"));
+        assert!(md.contains("Logical bundle `b11`"));
+        assert!(md.contains("classified `fee_too_low`"));
+        assert!(md.contains("**LANDED**"));
+        assert!(md.contains("https://explorer.solana.com/block/429560473"));
     }
 
     #[test]
@@ -356,12 +511,20 @@ mod tests {
         ];
         let md = render_decisions_markdown(&decisions);
         assert!(md.contains("AI Decision Timeline"));
-        assert!(md.contains("2 AI decisions"));
+        // All non-fallback providers → attributed to the AI agent, honestly.
+        assert!(md.contains("2 decisions recorded during the run, all by the **AI agent**"));
         assert!(md.contains("[retry]"));
         assert!(md.contains("blockhash expired; refresh and bump tip"));
         assert!(md.contains("refresh_blockhash"));
         // Empty case is honest.
         assert!(render_decisions_markdown(&[]).contains("No AI decisions"));
+        // Provenance is honest: a policy-fallback run is NOT attributed to the AI agent.
+        let fb = vec![
+            json!({"kind":"decision","decision_type":"tip","action":"x","reasoning":"agent unavailable","confidence":0.5,"provider":"policy-fallback","ts":"t","before":null,"after":{"tip":1}}),
+        ];
+        let md_fb = render_decisions_markdown(&fb);
+        assert!(md_fb.contains("all by the deterministic policy fallback"));
+        assert!(!md_fb.contains("by the **AI agent**"));
     }
 
     #[test]

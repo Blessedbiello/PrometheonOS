@@ -78,6 +78,10 @@ pub fn bundle_submitted_event(b: &SubmittedBundle) -> TelemetryEvent {
         signatures: vec![b.signature.clone()],
         phase: BundlePhase::Submitted,
         ts: b.submitted_at,
+        // Carry the logical-bundle + attempt linkage so the export can chain a failed attempt to its
+        // recovered resubmission (the AI recovery unit).
+        base_id: Some(b.base_id.clone()),
+        attempt: Some(b.attempt_no),
     })
 }
 

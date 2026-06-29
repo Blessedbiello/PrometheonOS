@@ -55,6 +55,22 @@
         "ts"
       ],
       "properties": {
+        "attempt": {
+          "description": "1-indexed attempt number within `base_id` (attempt 1 is the first try; ≥2 are retries).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "base_id": {
+          "description": "The logical bundle this attempt belongs to — retries of the same bundle share a `base_id`. This lets the lifecycle-log export chain a failed attempt to its recovered resubmission (the AI recovery unit). Optional for backward compatibility with telemetry emitted before this field.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "bundle_id": {
           "type": "string"
         },

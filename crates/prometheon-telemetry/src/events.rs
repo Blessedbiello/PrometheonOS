@@ -37,6 +37,14 @@ pub struct BundleEvent {
     pub signatures: Vec<String>,
     pub phase: BundlePhase,
     pub ts: DateTime<Utc>,
+    /// The logical bundle this attempt belongs to — retries of the same bundle share a `base_id`. This
+    /// lets the lifecycle-log export chain a failed attempt to its recovered resubmission (the AI
+    /// recovery unit). Optional for backward compatibility with telemetry emitted before this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_id: Option<String>,
+    /// 1-indexed attempt number within `base_id` (attempt 1 is the first try; ≥2 are retries).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
 }
 
 /// A lifecycle transition tagged with the bundle/signature it belongs to.

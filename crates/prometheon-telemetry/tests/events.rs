@@ -43,6 +43,8 @@ fn bundle_event_roundtrips_and_maps_subject() {
         signatures: vec!["sig1".into()],
         phase: BundlePhase::Submitted,
         ts: Utc::now(),
+        base_id: Some("b1".into()),
+        attempt: Some(1),
     });
     assert_eq!(roundtrip(&ev), ev);
     assert_eq!(ev.subject(), "telemetry.bundle");

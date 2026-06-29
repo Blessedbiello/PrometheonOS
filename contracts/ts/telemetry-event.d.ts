@@ -18,6 +18,14 @@ export type TelemetryEvent =
       [k: string]: unknown;
     }
   | {
+      /**
+       * 1-indexed attempt number within `base_id` (attempt 1 is the first try; ≥2 are retries).
+       */
+      attempt?: number | null;
+      /**
+       * The logical bundle this attempt belongs to — retries of the same bundle share a `base_id`. This lets the lifecycle-log export chain a failed attempt to its recovered resubmission (the AI recovery unit). Optional for backward compatibility with telemetry emitted before this field.
+       */
+      base_id?: string | null;
       bundle_id: string;
       kind: "bundle";
       phase: BundlePhase;
