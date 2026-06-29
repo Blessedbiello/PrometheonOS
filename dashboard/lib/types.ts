@@ -67,8 +67,14 @@ export interface BundleRow {
   latencies: BundleLatencies;
   /** Failure class if stage is failed/expired/dropped, plus injection flag. */
   failure_class: FailureClass | null;
+  /** Classifier confidence for `failure_class` (0–1), if classified. */
+  failure_confidence: number | null;
   injected: boolean;
   retry_attempt: number;
+  /** Recovery linkage: retries of one logical bundle share a `base_id`; `attempt` is 1-indexed. The
+   *  Execution Rail threads a failed attempt to its recovered resubmission by these. */
+  base_id: string | null;
+  attempt: number | null;
 }
 
 export interface DecisionRow {
@@ -95,15 +101,21 @@ export interface HealthSnapshot {
   avg_confirmed_latency_ms: number | null;
   confirm_latency_variance_ms: number | null;
   tip_floor_lamports: number;
+  /** Live Jito tip-floor distribution (P75/P95) when available — the competitive band the AI targets.
+   *  Optional: the live engine currently emits only the median; the proof-replay carries all three. */
+  tip_floor_p75_lamports?: number | null;
+  tip_floor_p95_lamports?: number | null;
   /** processed→confirmed delta (network-health signal behind README Q1). */
   processed_to_confirmed_delta_ms: number | null;
 }
 
 export interface DashboardSnapshot {
   ts: string;
-  /** Whether this snapshot is real engine telemetry or the offline mock simulation. The UI must
-   *  surface this honestly — never show a "live" indicator over simulated data. */
-  source: "live" | "mock";
+  /** Provenance of this snapshot — the UI must surface it honestly and never show "live" over
+   *  non-live data. `live` = real engine telemetry over NATS; `mock` = the offline simulation;
+   *  `proof` = a deterministic replay of the COMMITTED mainnet proof run (real on-chain data + real
+   *  explorer links), used so the recovery hero plays on cue without faking liveness. */
+  source: "live" | "mock" | "proof";
   network: "testnet" | "mainnet" | "mock";
   current_slot: number;
   next_jito_leader_in_slots: number | null;

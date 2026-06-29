@@ -27,6 +27,12 @@ async fn main() -> anyhow::Result<()> {
     let out_dir = Path::new("logs");
     std::fs::create_dir_all(out_dir)?;
     std::fs::write(out_dir.join("lifecycle-log.json"), render_json(&entries)?)?;
+    // The AI decisions as JSON too — the dashboard's proof-replay source folds these back into the
+    // live snapshot so the committed run's real reasoning drives the on-screen recovery.
+    std::fs::write(
+        out_dir.join("ai-decisions.json"),
+        serde_json::to_string_pretty(&decisions)?,
+    )?;
     // Markdown: the per-bundle lifecycle table + the AI Decision Timeline (judge-visible reasoning).
     let mut md = render_markdown(&entries, &explorer);
     md.push_str(&render_decisions_markdown(&decisions));

@@ -126,6 +126,7 @@ export class MockState {
         // ~5% of submitted bundles fail (mix of injected expiry and organic).
         b.stage = "expired";
         b.failure_class = "expired_blockhash";
+        b.failure_confidence = 0.92;
         b.injected = this.rand() < 0.5;
       }
     }
@@ -148,8 +149,11 @@ export class MockState {
         submit_ts: this.ts(),
         latencies: { processed_ms: null, confirmed_ms: null, finalized_ms: null },
         failure_class: null,
+        failure_confidence: null,
         injected: false,
         retry_attempt: 0,
+        base_id: `b${this.bundleSeq.toString().padStart(2, "0")}`,
+        attempt: 1,
       });
     }
   }

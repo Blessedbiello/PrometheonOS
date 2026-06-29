@@ -2,27 +2,67 @@
 
 :root {
   color-scheme: dark;
+  --bg: #0b0b0c;
 }
 
 html,
 body {
   height: 100%;
-  background: #0a0a0b;
+  background: var(--bg);
   color: #e5e7eb;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-grotesk), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "ss01", "cv11";
 }
 
+/* Monospace ticker face for all numbers/ids. */
 .mono {
-  font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono), ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
-/* Subtle scanline texture for the ops-console aesthetic. */
-.ops-bg {
-  background: radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.04), transparent 40%),
-    radial-gradient(circle at 90% 100%, rgba(132, 204, 22, 0.03), transparent 40%),
-    #0a0a0b;
+/* Technical labels — condensed grotesk, used for station names and section titles. */
+.label {
+  font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+}
+
+/* The instrument backdrop: graphite + a faint corner vignette (no SaaS gradient blob). */
+.instrument {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(34, 211, 238, 0.05), transparent 55%),
+    radial-gradient(100% 60% at 50% 110%, rgba(16, 185, 129, 0.035), transparent 55%),
+    var(--bg);
+}
+
+/* Engraved measurement graticule — a fine grid that reads as an instrument surface, not a card. */
+.graticule {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 32px);
+}
+
+/* A faint CRT scanline texture for the rail/hero surfaces. */
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+}
+
+/* A slow sweeping timebase line (used sparingly on the rail to feel "live"). */
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.timebase {
+  animation: sweep 7s linear infinite;
 }

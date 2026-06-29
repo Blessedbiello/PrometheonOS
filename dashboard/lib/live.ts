@@ -119,8 +119,11 @@ export class LiveTelemetry {
           submit_ts: String(ev.ts),
           latencies: { processed_ms: null, confirmed_ms: null, finalized_ms: null },
           failure_class: null,
+          failure_confidence: null,
           injected: false,
-          retry_attempt: 0,
+          retry_attempt: ev.attempt != null ? Math.max(0, Number(ev.attempt) - 1) : 0,
+          base_id: (ev.base_id as string | undefined) ?? null,
+          attempt: ev.attempt != null ? Number(ev.attempt) : null,
         };
         row.tip_lamports = Number(ev.tip_lamports ?? row.tip_lamports);
         this.upsertBundle(row);
@@ -148,6 +151,7 @@ export class LiveTelemetry {
         const row = this.bundles.get(id);
         if (!row) break;
         row.failure_class = (cls.class as FailureClass) ?? "unclassified";
+        row.failure_confidence = cls.confidence != null ? Number(cls.confidence) : null;
         if (!FAILURE_STAGES.has(row.stage)) row.stage = "failed";
         this.upsertBundle(row);
         break;

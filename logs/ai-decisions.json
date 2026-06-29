@@ -1,0 +1,308 @@
+[
+  {
+    "action": "submit",
+    "after": {
+      "hold": false
+    },
+    "before": null,
+    "confidence": 0.93,
+    "decision_type": "timing",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "currentLeader": "9eGrDohdNTAo61DRHyfMuqKWXqYnA3i254Wiszxe8FoY",
+      "currentSlot": 429571791,
+      "slotsUntilLeaderChange": 1
+    },
+    "kind": "decision",
+    "latency_ms": 1883,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (no network congestion) and only 1 slot remains before leader change, so submitting now avoids added latency. No evidence the upcoming leader is a Jito validator, so no benefit in holding.",
+    "ts": "2026-06-29T01:57:24.354Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 12000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1057,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (low load). Tip floor at the 75th percentile is 10035 lamports and at the 95th percentile is 100000 lamports. To balance cost and inclusion probability, we choose a tip slightly above the 75th percentile, well within the P75‑P95 band, at 12000 lamports.",
+    "ts": "2026-06-29T01:57:25.419Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 12000
+    },
+    "before": null,
+    "confidence": 0.86,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1318,
+    "provider": "openai",
+    "reasoning": "CongestionScore=0 indicates low load; tipFloorP75Lamports=10035 gives reliable inclusion. Choosing a tip modestly above P75 (12000 lamports) stays in the P75‑P95 band while conserving cost.",
+    "ts": "2026-06-29T01:57:29.577Z"
+  },
+  {
+    "action": "Set Jito tip",
+    "after": {
+      "tip": 10035
+    },
+    "before": null,
+    "confidence": 0.87,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1535,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (low), tipFloorP50Lamports=5542, tipFloorP75Lamports=10035, tipFloorP95Lamports=100000. With low congestion we can stay at the lower end of the reliable band, so we choose the P75 floor (10035 lamports) to balance cost and inclusion probability.",
+    "ts": "2026-06-29T01:57:34.064Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 28028
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1217,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (no congestion). To achieve reliable inclusion we must stay within the P75‑P95 band. With low congestion we can target the lower side of that band, selecting a tip modestly above tipFloorP75Lamports (~10k) but well below P95. Chosen tip ~28,000 lamports balances cost and landing probability.",
+    "ts": "2026-06-29T01:57:38.125Z"
+  },
+  {
+    "action": "set jito tip",
+    "after": {
+      "tip": 11000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1082,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0, indicating a clear block space. The P75 floor is 10035 lamports, well above the noise floor, and P95 is 100000 lamports. With no congestion we can target the lower end of the reliable band, just above P75, to balance cost and inclusion probability.",
+    "ts": "2026-06-29T01:57:42.115Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 12000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1400,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0, indicating low network load. The tip floor at the 75th percentile is 10035 lamports, which should reliably land in these conditions. Selecting a tip modestly above this level (~12000 lamports) provides a safety margin without overpaying.",
+    "ts": "2026-06-29T01:57:46.428Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 19000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1302,
+    "provider": "openai",
+    "reasoning": "Low congestion (score 0) lets us stay near the lower end of the reliable band. Tip floor P75 is 10035 lamports and P95 is 100000 lamports; picking ~19 k lamports (~10 % above P75) balances cost and inclusion probability.",
+    "ts": "2026-06-29T01:57:50.574Z"
+  },
+  {
+    "action": "setTip",
+    "after": {
+      "tip": 32526
+    },
+    "before": null,
+    "confidence": 0.78,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1301,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (very low), so a tip near the lower end of the P75‑P95 band is sufficient. Using the live floor values, we pick a tip of 32,526 lamports, which is above the P75 floor (10,035) but well below the P95 floor (100,000), matching low‑congestion conditions.",
+    "ts": "2026-06-29T01:57:54.748Z"
+  },
+  {
+    "action": "setTip",
+    "after": {
+      "tip": 11000
+    },
+    "before": null,
+    "confidence": 0.86,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1297,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0, indicating minimal network load. The tip floor P75 is 10035 lamports and P95 is 100000 lamports. With low congestion we can stay near the lower end of the reliable band; a tip of 11000 lamports comfortably exceeds P75 while remaining far below P95, balancing cost and landing probability.",
+    "ts": "2026-06-29T01:57:58.873Z"
+  },
+  {
+    "action": "setTip",
+    "after": {
+      "tip": 12000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 940,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (minimal), so a tip near the lower end of the reliable band suffices. Using the P75 floor (10035 lamports) plus a modest safety margin yields ~12000 lamports, staying within the P75‑P95 window while avoiding excess cost.",
+    "ts": "2026-06-29T01:58:02.864Z"
+  },
+  {
+    "action": "set tip",
+    "after": {
+      "tip": 20000
+    },
+    "before": null,
+    "confidence": 0.85,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1163,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0 (no congestion), so a tip just above the P75 floor is sufficient. P75 is 10035 lamports; choosing 20000 lamports places us comfortably in the P75–P95 band without overspending on the P95 extreme, maximizing cost‑efficiency while maintaining high inclusion probability.",
+    "ts": "2026-06-29T01:58:06.874Z"
+  },
+  {
+    "action": "set tip to 10035 lamports",
+    "after": {
+      "tip": 10035
+    },
+    "before": null,
+    "confidence": 0.88,
+    "decision_type": "tip",
+    "inputs_considered": {
+      "congestionScore": 0,
+      "tipFloorP50Lamports": 5542,
+      "tipFloorP75Lamports": 10035,
+      "tipFloorP95Lamports": 100000
+    },
+    "kind": "decision",
+    "latency_ms": 1405,
+    "provider": "openai",
+    "reasoning": "CongestionScore is 0, indicating no current network pressure. The tipFloorP75Lamports is 10035, placing us at the start of the reliable P75‑P95 band. With zero congestion we can target the lower bound of this band to minimize cost while still maintaining a good inclusion chance.",
+    "ts": "2026-06-29T01:58:11.112Z"
+  },
+  {
+    "action": "RefreshBlockhashAndResubmit",
+    "after": {
+      "refresh_blockhash": true,
+      "tip": 235000
+    },
+    "before": null,
+    "confidence": 0.97,
+    "decision_type": "retry",
+    "inputs_considered": {
+      "attempt": 1,
+      "congestionScore": 0,
+      "failureClass": "ExpiredBlockhash",
+      "lastTipLamports": 235000,
+      "slotStabilityScore": null,
+      "tipFloorP50Lamports": 5542
+    },
+    "kind": "decision",
+    "latency_ms": 1400,
+    "provider": "openai",
+    "reasoning": "FailureClass=ExpiredBlockhash indicates the recent blockhash is no longer valid. Telemetry shows lastTipLamports=235000 which comfortably exceeds tipFloorP50Lamports=5542, so the current tip is sufficient. Refreshing the blockhash and resubmitting with the same tip is safe and likely to succeed.",
+    "ts": "2026-06-29T01:59:20.190Z"
+  },
+  {
+    "action": "retry",
+    "after": {
+      "refresh_blockhash": false,
+      "tip": 5600
+    },
+    "before": null,
+    "confidence": 0.92,
+    "decision_type": "retry",
+    "inputs_considered": {
+      "attempt": 1,
+      "congestionScore": 0,
+      "failureClass": "FeeTooLow",
+      "lastTipLamports": 1000,
+      "slotStabilityScore": null,
+      "tipFloorP50Lamports": 5542
+    },
+    "kind": "decision",
+    "latency_ms": 1422,
+    "provider": "openai",
+    "reasoning": "FailureClass=FeeTooLow; current tip 1000 lamports is below tipFloorP50 5542 lamports, so transaction was rejected for insufficient fee. No blockhash expiration indicated, so we keep the same blockhash and increase tip above the floor.",
+    "ts": "2026-06-29T01:59:26.667Z"
+  }
+]
