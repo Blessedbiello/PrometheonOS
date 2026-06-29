@@ -292,8 +292,10 @@ mod tests {
 
     #[test]
     fn nonland_classification_uses_injected_scenario() {
+        // The stale-blockhash fault carries a competitive tip (≥ floor 20_000), so the expiry — not the
+        // fee — is the cause; a sub-floor tip would (correctly) classify as FeeTooLow instead.
         assert_eq!(
-            classify_nonland(&mk(Some(FaultScenario::BlockhashExpiry), 14_500)).class,
+            classify_nonland(&mk(Some(FaultScenario::BlockhashExpiry), 25_000)).class,
             FailureClass::ExpiredBlockhash
         );
         assert_eq!(
@@ -320,9 +322,10 @@ mod tests {
     #[test]
     fn real_signals_classify_from_data_not_the_injected_tag() {
         use prometheon_failure::OnChainError;
-        // Expired: real block height past lastValidBlockHeight (no injection tag involved).
+        // Expired: real block height past lastValidBlockHeight, with an adequate tip (so expiry, not
+        // fee, is the cause — no injection tag involved).
         let expired = signals_from_observation(&FailureObservation {
-            tip_lamports: 14_500,
+            tip_lamports: 25_000,
             tip_floor_p50_lamports: 20_000,
             blockhash_valid: Some(false),
             block_height: Some(1_000),

@@ -103,7 +103,7 @@ async fn proof_run_emits_a_populated_lifecycle_log_with_failures() {
     submitted.push(SubmittedBundle {
         bundle_id: "bundle-11".into(),
         signature: "sig-11".into(),
-        tip_lamports: 14_500,
+        tip_lamports: 50_000, // competitive tip (≥ floor) → the expiry, not the fee, is the cause
         tip_account: "Tip1111111111111111111111111111111111111111".into(),
         region: "ny".into(),
         submitted_at: ts(0),

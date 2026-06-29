@@ -67,14 +67,14 @@ impl DecisionSource for FakeDecider {
     async fn decide(&self, dtype: DecisionType, context: Value) -> Option<Decision> {
         let (action, reasoning, after) = match dtype {
             DecisionType::Tip => (
-                "tip 15000 lamports",
-                "floor + congestion → target ~p50",
-                json!({ "tip": 15_000 }),
+                "tip 25000 lamports",
+                "floor + congestion → target the competitive P75–P95 band (≥ floor)",
+                json!({ "tip": 25_000 }),
             ),
             DecisionType::Retry => (
-                "refresh blockhash, re-price 15000->25000",
+                "refresh blockhash, re-price 25000->30000",
                 "blockhash expired (height past lastValidBlockHeight); refresh and bump tip as congestion rose",
-                json!({ "refresh_blockhash": true, "tip": 25_000 }),
+                json!({ "refresh_blockhash": true, "tip": 30_000 }),
             ),
             DecisionType::Timing => ("submit now", "leader window open", json!({})),
         };
@@ -323,7 +323,7 @@ impl Submitter for ProbeSubmitter {
         Ok(SubmittedBundle {
             bundle_id: format!("{}#a{}", spec.base_id, spec.attempt_no),
             signature: format!("{}-s{}", spec.base_id, spec.attempt_no),
-            tip_lamports: 14_500, // adequate tip → the injection/heuristic path would say "timeout"
+            tip_lamports: 25_000, // competitive tip (≥ floor) → only the probe's expiry signal is the cause
             tip_account: "Tip".into(),
             region: "ny".into(),
             submitted_at: ts(spec.attempt_no as i64),
@@ -343,7 +343,7 @@ impl Submitter for ProbeSubmitter {
         _sb: &SubmittedBundle,
     ) -> Option<prometheon_failure::FailureSignals> {
         Some(signals_from_observation(&FailureObservation {
-            tip_lamports: 14_500,
+            tip_lamports: 25_000,
             tip_floor_p50_lamports: 20_000,
             blockhash_valid: Some(false),
             block_height: Some(1_000),

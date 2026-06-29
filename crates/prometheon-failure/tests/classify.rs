@@ -113,6 +113,32 @@ fn bundle_failure_when_inflight_failed_without_onchain_error() {
 }
 
 #[test]
+fn sub_floor_tip_beats_probe_time_expiry_and_generic_inflight_failure() {
+    // The low-tip fault, classified from real probe data: by probe time (after the give-up wait) the
+    // blockhash has naturally expired and Jito reports a generic inflight `Failed` — neither names the
+    // cause. The sub-floor tip is the decisive, time-invariant root cause (could never win the
+    // auction), so it must win over both.
+    let mut s = base();
+    s.tip_lamports = 1_000;
+    s.tip_floor_p50_lamports = 9_360;
+    s.blockhash_valid = Some(false); // expired during the unavoidable wait
+    s.bundle_status_failed = true; // Jito's generic "Failed"
+    assert_eq!(classify(&s).class, FailureClass::FeeTooLow);
+}
+
+#[test]
+fn adequate_tip_with_expiry_is_expired_blockhash_not_generic_failure() {
+    // The stale-blockhash fault: the tip is competitive (≥ floor), so the expired blockhash is the
+    // cause — and it must win over the generic inflight-`Failed` signal.
+    let mut s = base();
+    s.tip_lamports = 200_000;
+    s.tip_floor_p50_lamports = 9_360;
+    s.blockhash_valid = Some(false);
+    s.bundle_status_failed = true;
+    assert_eq!(classify(&s).class, FailureClass::ExpiredBlockhash);
+}
+
+#[test]
 fn skipped_slot_and_leader_miss_are_distinguished_by_grade() {
     let mut s = base();
     s.blockhash_valid = Some(true);

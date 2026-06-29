@@ -149,17 +149,28 @@ pub fn classify(s: &FailureSignals) -> FailureClassification {
         };
     }
 
-    // 2. Bundle marked failed across all regions (no decoded on-chain error).
-    if s.bundle_status_failed {
+    // We probe a bundle only AFTER a full give-up window, so by probe time the blockhash has
+    // *naturally* expired for essentially every non-land, and Jito reports a generic inflight
+    // `Failed` — neither names the root cause. So rank the remaining signals by how decisive and
+    // *time-invariant* they are: a sub-floor tip means the bundle could never have won the auction
+    // regardless of the blockhash, so fee-too-low is judged before the (confounded) blockhash expiry;
+    // the generic inflight-`Failed` is a last resort, only when no specific cause is observed.
+
+    // 2. Fee too low — a sub-floor tip is a time-invariant root cause (inferred from tip vs floor).
+    if !s.landed && s.tip_floor_p50_lamports > 0 && s.tip_lamports < s.tip_floor_p50_lamports {
+        let shortfall =
+            (s.tip_floor_p50_lamports - s.tip_lamports) as f64 / s.tip_floor_p50_lamports as f64; // (0, 1]
+        let confidence = (0.55 + 0.30 * shortfall).clamp(0.55, 0.85);
         return FailureClassification::new(
-            F::BundleFailure,
-            0.85,
-            Observable,
-            "inflight status Failed across all regions",
+            F::FeeTooLow,
+            confidence,
+            Inferred,
+            "not landed while tip is below the median floor; raise tip/priority fee",
         );
     }
 
-    // 3. Blockhash expiry is observable from block height / isBlockhashValid.
+    // 3. Blockhash expiry is observable from block height / isBlockhashValid. With an adequate tip,
+    //    an expired blockhash is the cause (this is the deliberate stale-blockhash fault).
     if s.block_height_exceeded || s.blockhash_valid == Some(false) {
         return FailureClassification::new(
             F::ExpiredBlockhash,
@@ -169,9 +180,8 @@ pub fn classify(s: &FailureSignals) -> FailureClassification {
         );
     }
 
-    // Beyond here, the bundle did not land and the window may still be open.
     if !s.landed {
-        // 4a. Skipped slot is observable on the slot stream.
+        // 4. Skipped slot is observable on the slot stream.
         if s.slot_skipped {
             return FailureClassification::new(
                 F::SkippedSlot,
@@ -180,7 +190,7 @@ pub fn classify(s: &FailureSignals) -> FailureClassification {
                 "target slot was skipped; retry into the next produced slot",
             );
         }
-        // 4b. Leader miss is inferred (we cannot see the leader directly).
+        // 5. Leader miss is inferred (we cannot see the leader directly).
         if s.leader_missed {
             return FailureClassification::new(
                 F::LeaderMiss,
@@ -189,30 +199,29 @@ pub fn classify(s: &FailureSignals) -> FailureClassification {
                 "scheduled leader produced no accepted block; rebroadcast to next Jito leader",
             );
         }
-        // 4c. Fee too low is inferred from tip below the floor while the window is open.
-        if s.tip_floor_p50_lamports > 0 && s.tip_lamports < s.tip_floor_p50_lamports {
-            let shortfall = (s.tip_floor_p50_lamports - s.tip_lamports) as f64
-                / s.tip_floor_p50_lamports as f64; // (0, 1]
-            let confidence = (0.55 + 0.30 * shortfall).clamp(0.55, 0.85);
-            return FailureClassification::new(
-                F::FeeTooLow,
-                confidence,
-                Inferred,
-                "not landed while tip is below the median floor; raise tip/priority fee",
-            );
-        }
-        // 4d. Confirmation timeout with the window still open.
-        if s.confirmation_timeout {
-            return FailureClassification::new(
-                F::ConfirmationTimeout,
-                0.7,
-                Observable,
-                "no status by deadline while blockhash valid; rebroadcast within the window",
-            );
-        }
     }
 
-    // 5. Nothing matched.
+    // 6. Bundle marked failed across all regions with no more specific cause decoded.
+    if s.bundle_status_failed {
+        return FailureClassification::new(
+            F::BundleFailure,
+            0.85,
+            Observable,
+            "inflight status Failed across all regions (no more specific cause observed)",
+        );
+    }
+
+    // 7. Confirmation timeout with the window still open.
+    if !s.landed && s.confirmation_timeout {
+        return FailureClassification::new(
+            F::ConfirmationTimeout,
+            0.7,
+            Observable,
+            "no status by deadline while blockhash valid; rebroadcast within the window",
+        );
+    }
+
+    // 8. Nothing matched.
     FailureClassification::new(
         F::Unclassified,
         0.3,
