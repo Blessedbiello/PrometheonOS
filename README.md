@@ -202,7 +202,7 @@ lifecycle-log export (with an AI Decision Timeline) — is covered end-to-end, *
 `prometheon-core/tests/saga_pipeline.rs` (asserts ≥10 landed, ≥2 classified failures the agent
 recovers, and a retry decision with visible reasoning) and `proof_pipeline.rs`. The assembly path is
 additionally dry-run validated on mainnet (dynamic tip from live floor, rotating tip accounts, fresh
-blockhash + signature; only broadcast needs funding). ~180 Rust + 45 TS tests; CI runs fmt · clippy ·
+blockhash + signature; only broadcast needs funding). ~187 Rust + 51 TS tests; CI runs fmt · clippy ·
 tests · schema-drift · TS typecheck + tests · dependency audit.
 
 **Proven on mainnet — the funded proof run is committed.** `./scripts/run-proof.sh` opened **one**

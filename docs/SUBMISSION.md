@@ -76,7 +76,7 @@ tested with no network in `crates/prometheon-core/tests/saga_pipeline.rs`.
 ```bash
 cp .env.example .env                                   # fill RPC/Yellowstone/Jito/wallet/LLM keys
 docker compose -f infra/docker-compose.yml up -d       # NATS, Postgres+Timescale, Prometheus
-cargo test --workspace                                 # ~180 Rust tests, no network
+cargo test --workspace                                 # ~187 Rust tests, no network
 cargo run -p prometheon-core --bin preflight           # connectivity ✓/✗
 
 # Free dry-run (no funds): validates the whole assembly path against live mainnet
