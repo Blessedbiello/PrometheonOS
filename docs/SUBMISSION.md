@@ -14,8 +14,9 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
   [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) + [`docs/DIAGRAMS.md`](DIAGRAMS.md).
 - **Lifecycle log:** [`logs/lifecycle-log.md`](../logs/lifecycle-log.md) (+ `.json`) — a committed
   mainnet run: **12 bundles landed, 2 AI-recovered failures of 14 submissions**, each landed bundle
-  `submitted→processed→confirmed→finalized`; slot numbers verifiable on the explorer (e.g. block
-  [429547828](https://explorer.solana.com/block/429547828)).
+  `submitted→processed→confirmed→finalized`; the two faults classified from real signals as
+  `fee_too_low` and `expired_blockhash`; slot numbers verifiable on the explorer (e.g. block
+  [429560175](https://explorer.solana.com/block/429560175)).
 - **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
 
 ## Requirement → where it's satisfied

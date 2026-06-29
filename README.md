@@ -156,10 +156,11 @@ Yellowstone stream and submitted bundles **including ≥2 deterministically-inje
 exported [`logs/lifecycle-log.{json,md}`](logs/lifecycle-log.md). The committed run:
 **12 bundles landed, 2 failed of 14 submissions** — every landed bundle advancing
 `submitted→processed→confirmed→finalized`, slots **verifiable on the explorer** (e.g.
-[429547828](https://explorer.solana.com/block/429547828)), submit→confirmed deltas of **~0.45–1.7 s**,
-and **15 real AI decisions** (Groq `gpt-oss-120b`; 13 tip + 2 retry) in the log's AI Decision Timeline.
-Both injected faults — a sub-floor tip and an expired blockhash — were classified and **recovered to
-landing by the AI retry decision** (re-price / refresh + resubmit). It must be mainnet — Jito has no
+[429560175](https://explorer.solana.com/block/429560175)), submit→confirmed deltas of **~0.3–1.8 s** for
+most landings (a couple of stragglers to ~5 s), and **real AI decisions** (Groq `gpt-oss-120b`; tip +
+retry) in the log's AI Decision Timeline. Both injected faults were classified from real signals —
+the sub-floor tip as **`fee_too_low`**, the expired blockhash as **`expired_blockhash`** — and each was
+**recovered to landing by the AI retry decision** (re-price / refresh + resubmit). It must be mainnet — Jito has no
 devnet Block Engine and the SolInfra stream is mainnet; the free dry-run validates the same assembly
 path without funds.
 
@@ -177,9 +178,9 @@ the network-health model tracks `confirm_latency_variance_ms` and folds it into 
 `congestion_score` the AI strategist reasons over.
 
 > Provenance: confirmed by the committed funded run — [`logs/lifecycle-log.md`](logs/lifecycle-log.md)
-> records real per-bundle submit→confirmed deltas of **~0.45–1.7 s** across 12 mainnet landings (small
-> and stable, exactly the healthy regime described above), each advancing
-> `processed → confirmed → finalized` with explorer-verifiable slots.
+> records real per-bundle submit→confirmed deltas of **~0.3–1.8 s** for most of the 12 mainnet landings
+> (small and stable, exactly the healthy regime described above; a couple of stragglers reach ~5 s),
+> each advancing `processed → confirmed → finalized` with explorer-verifiable slots.
 
 **2. Why should you never use `finalized` commitment when fetching a blockhash for a time-sensitive transaction?**
 
