@@ -6,15 +6,15 @@ Captured from the live `openai` provider (no mock). These are real model decisio
 
 **Action:** Set Jito tip
 
-**Confidence:** 0.78 · **Provider:** openai · **Latency:** 1861 ms
+**Confidence:** 0.78 · **Provider:** openai · **Latency:** 2246 ms
 
-**Reasoning:** P50 floor is 14,200 lamports. CongestionScore 0.62 and recent failure suggest modest upward pressure; applying a ~12% bump (congestionScore × 0.2) yields ~1,6000 lamports, which balances cost vs landing probability (0.7) and improves chance of landing without overspending.
+**Reasoning:** CongestionScore is 0.62 and current landing probability 0.7, indicating moderate‑high network load. The P50 floor is 14,200 lamports; estimating the 75‑95 percentile band as roughly 21k‑28k lamports, we target the upper end to boost inclusion. Selected tip=26,000 lamports.
 
 ```json
 {
   "before": null,
   "after": {
-    "tip": 16000
+    "tip": 26000
   },
   "inputs": {
     "congestionScore": 0.62,
@@ -30,18 +30,18 @@ Captured from the live `openai` provider (no mock). These are real model decisio
 
 ## retry decision
 
-**Action:** Refresh blockhash and resubmit with increased tip
+**Action:** retry_with_refresh_and_updated_tip
 
-**Confidence:** 0.94 · **Provider:** openai · **Latency:** 1156 ms
+**Confidence:** 0.93 · **Provider:** openai · **Latency:** 1288 ms
 
-**Reasoning:** Failure class is ExpiredBlockhash, so the recent blockhash is no longer valid. Telemetry shows a tip floor of 16800 lamports and current tip 14500, plus moderate congestion (0.74). Refreshing the blockhash and raising the tip to at least the floor ensures the transaction is accepted.
+**Reasoning:** Failure class ExpiredBlockhash requires a fresh recent blockhash; congestionScore 0.74 and tipFloorP50Lamports 16800 indicate current tip is below floor, so increase tip to 18000 lamports to improve priority.
 
 ```json
 {
   "before": null,
   "after": {
     "refresh_blockhash": true,
-    "tip": 16800
+    "tip": 18000
   },
   "inputs": {
     "failureClass": "ExpiredBlockhash",

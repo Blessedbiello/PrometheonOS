@@ -16,7 +16,9 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
   mainnet run: **12 bundles landed, 2 AI-recovered failures of 14 submissions**, each landed bundle
   `submitted→processed→confirmed→finalized`; the two faults classified from real signals as
   `fee_too_low` and `expired_blockhash`; slot numbers verifiable on the explorer (e.g. block
-  [429560175](https://explorer.solana.com/block/429560175)).
+  [429572113](https://explorer.solana.com/block/429572113)); the failure→recover→land chains render at the
+  top of the log as explicit, explorer-verifiable **AI Recovery Chains**, and all 15 decisions in the
+  timeline are real `openai`/Groq (zero deterministic fallback).
 - **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
 
 ## Requirement → where it's satisfied
@@ -27,7 +29,7 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
 | Slot/leader monitoring via Yellowstone gRPC | `prometheon-ingest::yellowstone` — supervised `Subscribe`, reconnect w/ `from_slot` replay, drop-newest backpressure, keepalive/ping. |
 | Detect the correct leader window | `rpc::get_slot_leaders` (`getSlotLeaders`) + `leader::LeaderSchedule` (slots-until-rotation) → a live submission-timing decision. (Full Jito-leader classification needs the searcher gRPC + auth; documented.) |
 | Construct + submit Jito bundles | `prometheon-bundle` — co-located tip (no tip on a failed bundle), legacy tx (tip account never in an ALT), base64 `sendBundle`, region failover, ~1 rps pacing. |
-| Dynamic tips, no hardcoded values | tip from live `tip_floor` percentiles + congestion (`bundle::compute_tip`); the **AI** sets it per bundle, reasoning over the live P50/P75/P95 distribution and targeting the competitive P75–P95 band (P50 sits at the Jito noise floor and rarely lands); the core clamps to a policy band with a competitive floor (`proof::apply_tip_policy`). |
+| Dynamic tips, no hardcoded values | tip from live `tip_floor` percentiles + congestion (`bundle::compute_tip`); the **AI proposes** it per bundle, reasoning over the live P50/P75/P95 distribution; the deterministic core enforces a competitive `[200_000, 1_000_000]` band (`proof::apply_tip_policy`) — **lifting** a sub-floor proposal to the 200k floor, so in the proof run the floor (not the model's exact number) sets the tip when the AI under-prices. Never hardcoded; never below the competitive floor. |
 | Lifecycle Submitted→Processed→Confirmed→Finalized (+ ts/slots/deltas) | `prometheon-lifecycle` state machine; deltas + `processed→confirmed` consensus signal captured. |
 | Classify expired-blockhash / fee-too-low / compute-exceeded / bundle-failure | `prometheon-failure::classify` — signal-based, confidence + observable-vs-inferred grade (full 18-class taxonomy in `FAILURE-TAXONOMY.md`). |
 | Confirm landing via stream subscriptions | `prometheon-core::proof::PendingBundles` correlates our signatures to lifecycles via tx-status + slot-status; RPC is only a cross-check. |
@@ -41,14 +43,22 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
 ## The AI decision it owns — Autonomous Retry with Fault Injection
 
 We deliberately inject a **blockhash expiry** (and a sub-floor tip). On a non-landing the deterministic
-core **classifies** the failure and asks the agent, over NATS, *whether and how to recover*. The agent
-reasons (refresh the blockhash? re-price the tip, to what?); the core enforces safety invariants (an
-expiry **always** forces a refresh; the tip is clamped); it **resubmits** the next attempt — which
-lands. The agent also sets the **tip** per bundle and makes a **submission-timing** call from the live
-leader schedule. Every decision persists `{inputs, reasoning, confidence, action, before/after,
-provider, latency, ts}`, renders on the live dashboard timeline, and is exported into the lifecycle log
-("AI Decision Timeline"). This is a reasoned decision in the loop — not sequential automation; the
-deterministic policy is only the fallback. Pluggable provider (Anthropic default / OpenAI / Ollama).
+core **classifies** the failure from real signals and asks the agent, over NATS, *whether and how to
+recover*. The agent's load-bearing decision is **which lever to pull**: it chose `refresh_blockhash:true`
++ keep-tip for the `expired_blockhash` fault, and keep-blockhash + raise-tip for the `fee_too_low` fault —
+two failures, two *different, correct* remedies. A causal contract **rejects** any reply omitting
+`after.tip`/`after.refresh_blockhash`, so the model's levers drive the action or the action doesn't happen.
+The core enforces safety it cannot override (a real expiry **always** forces a refresh; the tip is clamped
+to the competitive `[200_000, 1_000_000]` band) and **resubmits** the next attempt — which lands.
+
+**Honest scope of the AI's authority:** the agent *owns the recovery decision* (the `refresh_blockhash`
+binary is the provable, outcome-changing lever) and *proposes* the per-bundle tip — but in the committed
+run most tip proposals came in below the 200k competitive floor and were **lifted to it**, so the
+deterministic floor, not the model's exact number, set the tip. We sell this as the safety envelope
+working, not as the AI owning tip economics. Every decision persists `{inputs, reasoning, confidence,
+action, before/after, provider, latency, ts}`, renders on the live dashboard, and exports into the
+lifecycle log ("AI Decision Timeline"). A reasoned decision in the loop — not sequential automation.
+Pluggable provider (Anthropic / any OpenAI-compatible host / Ollama — the committed proof used Groq `gpt-oss-120b`).
 
 The whole AI-driven loop **including recovery** (attempt 1 failed → attempt 2 landed) is regression-
 tested with no network in `crates/prometheon-core/tests/saga_pipeline.rs`.

@@ -101,10 +101,14 @@ not the wire — mitigated by the ingest/processing split (RFC 0001).
 history); keypairs load with length validation and are never logged/cloned/serialized. The only
 value-moving instructions the wallet signs are a self-transfer (payer→payer) and the tip
 (payer→a Jito `getTipAccounts` address) — no attacker-controllable recipient, no drain/double-spend.
-Every tip is **clamped to `[1000, 1_000_000]` lamports (≤0.001 SOL) before signing**, so a poisoned AI
-decision or manipulated telemetry can overpay by at most ~0.001 SOL/bundle; the tip is **co-located**
-in the same tx as the strategy ix, so a non-landing pays nothing. The AI proposes a tip *value* within
-fixed, code-enforced bounds it cannot widen.
+Every tip is **clamped to a competitive `[200_000, 1_000_000]`-lamport band (≤0.001 SOL) before
+signing**: the `200_000` lower bound is a **competitive floor** that lifts a sub-floor AI proposal so
+the bundle still wins inclusion, and the `1_000_000` cap means a poisoned AI decision or manipulated
+telemetry can overpay by at most ~0.001 SOL/bundle. The tip is **co-located** in the same tx as the
+strategy ix, so a non-landing pays nothing. The AI proposes a tip *value* within these fixed,
+code-enforced bounds it cannot widen — and in practice (see the committed proof run) the **floor, not
+the model's exact number, sets the tip whenever the AI under-prices**: the deterministic competitive
+floor is doing the landing work, by design.
 
 **Known limitations (disclosed).** (1) **Retry-without-cancel** — Solana has no bundle cancel, so a
 given-up attempt and its retry can both land (two self-transfers + two clamped tips for one logical
@@ -114,14 +118,32 @@ placeholder credentials; NATS/Postgres/Prometheus/Grafana and the engine `/metri
 `127.0.0.1:9100`) must sit behind a VPN/firewall for any remote demo. NATS auth is supported by
 embedding credentials in `NATS_URL` (`nats://user:pass@host`); enable it for non-local deployments.
 (3) The dashboard `/api/telemetry` route is unauthenticated and intended for local/same-origin use.
-## 19. Cost analysis _(pending — actuals from the mainnet proof run)_
-## 20. Lessons learned _(pending — Phase 8)_
+## 19. Cost analysis
+The committed mainnet proof run (14 submissions: 12 landed + 2 AI-recovered) cost **~0.0025 SOL total**
+(~$0.5 at the time) — competitive tips of 200,000–235,000 lamports on landed bundles plus base fees; the
+two injected non-landings paid **zero tip** (co-located tip). The dominant cost lever is the
+**competitive tip floor** (§ tip policy), not the priority fee; a healthier live floor would let the
+AI's own (lower) proposals land and reduce this.
+
+## 20. Lessons learned
+- **The landed-tip distribution is brutally skewed.** The Jito `tip_floor` P50 routinely collapses to
+  the ~1000-lamport noise floor, so a P50-anchored tip almost never wins inclusion (in our first attempts
+  nothing landed until we moved to the P75–P95 band).
+  Only the P75–P95 band lands; we enforce a deterministic competitive floor (200k) so a sub-floor AI
+  proposal still lands — which means, honestly, the floor (not the model's number) sets most tips.
+- **Probe-time signals are confounded by the give-up wait.** We only probe a non-land after the full
+  window, by which point the blockhash has naturally expired for *every* non-land — so a sub-floor tip
+  (time-invariant) must outrank a probe-time expiry in the failure classifier.
+- **A blockhash refreshed for `refresh_blockhash` must be re-validated**: a non-refresh retry after the
+  ~60s landing wait was resubmitting on an expired blockhash (Jito 400) until we re-checked validity.
 
 ## 21. Implementation status & live validation
-The **read-only spine** is wired end-to-end and exercised against the live SolInfra mainnet stream
-(gRPC `fra.grpc.solinfra.dev:443`); the **funded submit/landing proof run is pending** (no committed
-lifecycle log yet — see §19/§20 and the README Status). Figures below are from development runs and
-are illustrative until the proof-run log is published:
+The **full stack** is wired end-to-end and **proven on mainnet**: the read-only spine runs against the
+live SolInfra stream (gRPC `fra.grpc.solinfra.dev:443`), and the **funded submit/landing proof run is
+committed** — `logs/lifecycle-log.{json,md}`: 12 bundles landed + 2 AI-recovered injected failures
+(`fee_too_low`, `expired_blockhash`) of 14 submissions, every landed bundle
+`submitted→processed→confirmed→finalized` with explorer-verifiable slots. Figures below are observed on
+the read-only engine and in that committed run:
 
 - **Ingestion → health → sinks.** `prometheon-core::engine` streams Yellowstone slots into the
   `NetworkHealthModel` and fans every `TelemetryEvent` through one `emit`: NATS pub/sub, a
@@ -134,11 +156,15 @@ are illustrative until the proof-run log is published:
   (`decision.request.retry`); the agent reasons and returns the levers the engine acts on — the new
   **tip** (`after.tip`) and whether to **refresh** (`after.refresh_blockhash`), enforced by a causal
   contract (a reply omitting them is rejected, not silently treated as a decision). **Division of
-  authority:** the agent owns the economics (tip sizing + the retry re-price) and the refresh
-  *escalation*; the deterministic `prometheon-retry` policy owns the safety gate — retry-vs-abandon,
-  the attempt cap, an always-forced refresh on a real expiry (the model may add a refresh but never
-  remove one), and the tip is clamped before signing. The core resubmits the next attempt, which
-  lands. The agent also sets the per-bundle **tip** (`decision.request.tip`) and makes a
+  authority (stated plainly):** the agent owns the **autonomous-retry decision** — which lever to pull
+  on a failure (refresh the blockhash vs. raise the tip) — and **proposes** the per-bundle tip; the
+  deterministic core owns the **safety envelope** — retry-vs-abandon, the attempt cap, an always-forced
+  refresh on a real expiry (the model may add a refresh but never remove one), and the competitive
+  `[200_000, 1_000_000]` tip clamp before signing. In the committed run most AI tip proposals landed
+  below the 200k competitive floor and were lifted to it, so the **floor — not the model's exact number
+  — set the tip**; the AI's provable, outcome-changing lever is therefore the retry decision itself (the
+  `refresh_blockhash` binary), not the precise tip economics. The core resubmits the next attempt,
+  which lands. The agent also **proposes** the per-bundle **tip** (`decision.request.tip`) and makes a
   **submission-timing** call from the live leader schedule that gates the run with a bounded hold.
   Every decision is emitted as `Decision` telemetry → dashboard timeline + the exported log. The whole
   loop, including recovery (attempt 1 failed → attempt 2 landed), is regression-tested with no network
@@ -166,6 +192,7 @@ are illustrative until the proof-run log is published:
   types; CI fails on drift. The dashboard consumes the live NATS feed and labels its status honestly
   (`source: live|mock` → "live"/"simulated"), never showing a live indicator over the mock feed.
 
-Remaining (Tier 5, gated on funding): the funded mainnet proof run (`scripts/run-proof.sh`) to
-produce the explorer-verifiable lifecycle log with real injected failures and a real AI reasoning
-trace, plus §19/§20 actuals + lessons from it.
+The funded mainnet proof run (`scripts/run-proof.sh`) is **complete and committed**:
+`logs/lifecycle-log.{json,md}` — 12 landed + 2 AI-recovered injected failures of 14 submissions, with
+the explorer-verifiable AI Recovery Chains, 15 real `openai`/Groq decisions, and §19/§20 actuals above.
+Remaining before submission is non-code: publish this doc to a public URL and record the demo video.

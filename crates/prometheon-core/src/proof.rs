@@ -46,8 +46,11 @@ pub fn priority_cu_price_micro(congestion: f64) -> u64 {
     (500.0 + 4_500.0 * c).round() as u64
 }
 
-/// The default tip policy (the AI agent / config may override; the tip *value* is always computed
-/// from live floor data, never hardcoded). Floor at the 1000-lamport Jito minimum.
+/// The default tip policy (the AI agent / config may propose a value; the tip is always derived from
+/// live floor data, never hardcoded). The `min_lamports` floor is a **competitive** 200k floor (well
+/// above the 1000-lamport Jito minimum), so a sub-floor AI proposal is lifted to it and still lands —
+/// which means in practice the floor, not the model's exact number, sets the tip when the AI
+/// under-prices (see the committed proof run).
 pub fn default_tip_strategy() -> TipStrategy {
     TipStrategy {
         // Target P95: the landed-tip distribution is heavily skewed and the floor endpoint is volatile
@@ -63,8 +66,10 @@ pub fn default_tip_strategy() -> TipStrategy {
 }
 
 /// Bound a resolved tip to the policy's `[min, max]`. The AI strategist *proposes* the tip; the
-/// deterministic core *caps* it, so a malformed or manipulated decision can never make us overpay
-/// (or under-tip below the Jito minimum). Defense-in-depth against decision poisoning.
+/// deterministic core *caps* the absurd-high side and *lifts* a sub-floor proposal up to the
+/// competitive `min_lamports` floor — so a malformed or manipulated decision can never make us overpay,
+/// and an under-priced proposal still lands (the floor, not the model's number, then sets the tip).
+/// Defense-in-depth against decision poisoning.
 pub fn bounded_tip(resolved_lamports: u64, strategy: &TipStrategy) -> u64 {
     resolved_lamports.clamp(strategy.min_lamports, strategy.max_lamports)
 }

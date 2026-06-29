@@ -4,9 +4,11 @@
 
 PrometheonOS observes the Solana network in real time, submits transactions intelligently as
 Jito bundles, tracks their lifecycle across every commitment level, classifies failures, and
-lets an AI strategist make and **explain** real operational decisions (tip sizing, submission
-timing, autonomous retry). It is built to feel like an internal execution engine used by a
-professional Solana infrastructure team — not a transaction sender with an LLM bolted on.
+lets an AI strategist make and **explain** real operational decisions (proposing tips, submission
+timing, and owning the autonomous-retry decision). It is built to feel like an internal **execution
+control plane** used by a professional Solana infrastructure team — the layer that decides and recovers
+*above* the transport (Jito / Sender / BDN) and fee estimators it consumes — not a transaction sender
+with an LLM bolted on.
 
 > Built for the Superteam Nigeria *Advanced Infrastructure Challenge — Build a Smart Transaction Stack*.
 
@@ -21,13 +23,19 @@ returns the concrete levers the engine then acts on: the new **tip** (read from 
 by the contract) and whether to **refresh the blockhash** (`after.refresh_blockhash`); the core
 **resubmits the next attempt**, which lands.
 
-**Honest division of authority:** the agent owns the *economics and the refresh escalation* (tip
-sizing per bundle, the retry's re-price, and adding a refresh), and supplies the visible reasoning;
-the deterministic policy (`prometheon-retry`) owns the *safety gate* — it decides retry-vs-abandon and
-the attempt cap, **always** forces a blockhash refresh on a true expiry (the model can add one but
-never remove it), and the tip is clamped to policy bounds before signing. So this is a genuine
-reasoned decision in the loop (not sequential automation), with the core as a safety envelope the
-model cannot override. The agent also makes a **submission-timing** call from the live leader
+**Honest division of authority:** the agent owns the **autonomous-retry decision** — on a failure it
+chooses *which lever* to pull (refresh the blockhash vs. raise the tip), causally enforced by a contract
+that **rejects** any reply omitting `after.tip` / `after.refresh_blockhash` — and it **proposes** the
+per-bundle tip, with visible reasoning. The deterministic core owns the **safety envelope**: it decides
+retry-vs-abandon and the attempt cap (`prometheon-retry`), **always** forces a blockhash refresh on a
+true expiry (the model can add one, never remove it), and clamps every tip to a **competitive
+`[200_000, 1_000_000]`-lamport band** before signing. That floor is load-bearing and we say so plainly:
+in the committed mainnet run, most AI tip *proposals* came in below the 200k competitive floor and were
+lifted to it — the safety envelope working as designed — so the floor, not the model's exact number,
+sets the tip when the AI under-prices. The AI's *provable, outcome-changing* lever is therefore the
+retry decision itself (the `refresh_blockhash` binary and the choice of which lever to pull), not the
+precise tip economics. This is a genuine reasoned decision in the loop — not sequential automation —
+with the core as a safety envelope the model cannot override. The agent also makes a **submission-timing** call from the live leader
 schedule. Every decision persists its full `{inputs, reasoning, confidence, action, before/after}`
 trace, renders on the live dashboard timeline, and is exported into the lifecycle log. The saga +
 recovery are regression-tested end-to-end without a network in
@@ -37,15 +45,34 @@ never silently treated as a decision) is enforced in `ai-agent` and tested there
 
 ## Why this is different
 
-- **AI genuinely in the loop** — the agent makes tip, timing, and autonomous-retry decisions *during*
-  the run; the recovered failure shows attempt 1 (classified failure) → attempt 2 (landed) in the log.
+**It's an execution *control plane*, not a transaction sender.** Everyone else sells a faster *pipe*
+(Jito Block Engine, Helius Sender, bloXroute BDN) or a *tip number* (Helius `getPriorityFeeEstimate`,
+Triton). PrometheonOS sits **above** them — it reads *why* a bundle failed off the stream and reasons it
+back to a finalized landing. It **consumes** transport + estimators; it does not replace them.
+
+```
+  Estimators   │  Helius getPriorityFeeEstimate · Triton            ┐
+  Transport    │  Jito Block Engine · Helius Sender · bloXroute BDN  ┘ ← consumed
+  ─────────────┼──────────────────────────────────────────────────────────────
+  PrometheonOS │  CONTROL PLANE:  classify failure → decide (refresh vs. re-price) → recover to landing
+```
+
+- **AI genuinely in the loop** — the agent makes the autonomous-retry *decision* (which lever to pull)
+  and proposes the tip *during* the run; the recovered failure shows attempt 1 (classified failure) →
+  attempt 2 (landed) as a linked **recovery chain** in the log.
+- **AI reasons over network state, not a constant** — given congestion `0.62` it targets the P75–P95
+  band (≈26,000 lamports); given an `ExpiredBlockhash` it returns `refresh_blockhash:true` (see
+  [`logs/ai-decision-trace.md`](logs/ai-decision-trace.md)). Different inputs → different, defensible levers.
 - **Network Health Model** — a live network-condition intelligence layer (congestion, slot
   stability, leader reliability, confirmation-latency variance, bundle landing probability,
   expiry risk) that the AI consumes.
 - **Stream-confirmed lifecycle** — landing is confirmed from the **Yellowstone gRPC stream**
   (slot status + tx-status), with RPC only as a cross-check.
-- **Dynamic tips, no hardcoding** — tips are computed from live Jito tip-floor percentiles +
-  current network conditions, then clamped to policy bounds (defense-in-depth vs. a bad decision).
+- **Dynamic tips + a competitive floor (stated honestly)** — tips are computed from live Jito tip-floor
+  percentiles + current conditions, then clamped to a **competitive `[200_000, 1_000_000]`-lamport
+  band**; a sub-floor AI proposal is *lifted* to the floor so the bundle reliably lands. In the proof
+  run the floor — not the model's exact number — set most tips; that's the deterministic safety envelope
+  working, and the AI's provable lever is the retry decision (the `refresh_blockhash` binary).
 - **Real leader-window detection** — the upcoming leader schedule from RPC `getSlotLeaders` drives a
   submission-timing decision (the Jito searcher `getNextScheduledLeader` is a gRPC searcher method
   needing approved auth; we time against the RPC schedule and let the Block Engine route to the next
@@ -156,9 +183,10 @@ Yellowstone stream and submitted bundles **including ≥2 deterministically-inje
 exported [`logs/lifecycle-log.{json,md}`](logs/lifecycle-log.md). The committed run:
 **12 bundles landed, 2 failed of 14 submissions** — every landed bundle advancing
 `submitted→processed→confirmed→finalized`, slots **verifiable on the explorer** (e.g.
-[429560175](https://explorer.solana.com/block/429560175)), submit→confirmed deltas of **~0.3–1.8 s** for
-most landings (a couple of stragglers to ~5 s), and **real AI decisions** (Groq `gpt-oss-120b`; tip +
-retry) in the log's AI Decision Timeline. Both injected faults were classified from real signals —
+[429572113](https://explorer.solana.com/block/429572113)), submit→confirmed deltas of **~0.4–1.8 s** for
+most landings (max ~5 s; the two AI-recovered attempts confirmed in **~0.7 s**), and **15 real AI
+decisions, all by the agent** (Groq `gpt-oss-120b` via the OpenAI-compatible provider; 1 timing + 12
+tip + 2 retry) in the log's AI Decision Timeline. Both injected faults were classified from real signals —
 the sub-floor tip as **`fee_too_low`**, the expired blockhash as **`expired_blockhash`** — and each was
 **recovered to landing by the AI retry decision** (re-price / refresh + resubmit). It must be mainnet — Jito has no
 devnet Block Engine and the SolInfra stream is mainnet; the free dry-run validates the same assembly
@@ -178,9 +206,10 @@ the network-health model tracks `confirm_latency_variance_ms` and folds it into 
 `congestion_score` the AI strategist reasons over.
 
 > Provenance: confirmed by the committed funded run — [`logs/lifecycle-log.md`](logs/lifecycle-log.md)
-> records real per-bundle submit→confirmed deltas of **~0.3–1.8 s** for most of the 12 mainnet landings
-> (small and stable, exactly the healthy regime described above; a couple of stragglers reach ~5 s),
-> each advancing `processed → confirmed → finalized` with explorer-verifiable slots.
+> records real per-bundle submit→confirmed deltas of **~0.4–1.8 s** for most of the mainnet landings
+> (small and stable, exactly the healthy regime described above; max ~5 s, and the two AI-recovered
+> attempts confirmed in ~0.7 s), each advancing `processed → confirmed → finalized` with
+> explorer-verifiable slots.
 
 **2. Why should you never use `finalized` commitment when fetching a blockhash for a time-sensitive transaction?**
 

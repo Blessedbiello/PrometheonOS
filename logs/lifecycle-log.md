@@ -2,114 +2,128 @@
 
 14 bundles · 12 landed · 2 failed. Slot numbers are verifiable on the Solana explorer.
 
+## AI Recovery Chains
+
+2 injected failures recovered to a **finalized landing on retry**. Each chain threads a failed attempt → its real-signal classification → the recovered resubmission; the retry decision that drove it (and its provider — AI agent or deterministic fallback) is in the **AI Decision Timeline** below.
+
+**Logical bundle `b11`**
+
+- attempt 1 · tip 1000 · sig `JL4u29…eCHk` → classified `fee_too_low` (conf 0.80) → AI retry decision ↓
+- attempt 2 · tip 200000 · sig `3ZdXFV…FPY4` → **LANDED** [429572113](https://explorer.solana.com/block/429572113) (finalized, Δ 650 ms)
+
+**Logical bundle `b12`**
+
+- attempt 1 · tip 235000 · sig `5NUZvb…MtAa` → classified `expired_blockhash` (conf 0.92) → AI retry decision ↓
+- attempt 2 · tip 235000 · sig `43bvsQ…HJAp` → **LANDED** [429572096](https://explorer.solana.com/block/429572096) (finalized, Δ 818 ms)
+
 | # | Bundle | Tip (lamports) | First slot | Progression | Submit→Confirmed | Failure |
 |---|--------|----------------|-----------|-------------|------------------|---------|
-| 1 | `04ad63…8747` | 1000 | — | submitted | — | fee_too_low |
-| 2 | `07523f…94b7` | 200000 | [429560253](https://explorer.solana.com/block/429560253) | submitted→processed→confirmed→finalized | 599 ms | — |
-| 3 | `25df30…9627` | 200000 | [429560211](https://explorer.solana.com/block/429560211) | submitted→processed→confirmed→finalized | 1786 ms | — |
-| 4 | `2a23b9…4331` | 200000 | [429560276](https://explorer.solana.com/block/429560276) | submitted→processed→confirmed→finalized | 1488 ms | — |
-| 5 | `326131…e00d` | 250000 | [429560175](https://explorer.solana.com/block/429560175) | submitted→processed→confirmed→finalized | 793 ms | — |
-| 6 | `3b08e5…ddba` | 200000 | [429560218](https://explorer.solana.com/block/429560218) | submitted→processed→confirmed→finalized | 304 ms | — |
-| 7 | `3xmLGp…HjjC` | 200000 | — | submitted | — | expired_blockhash |
-| 8 | `56768e…d665` | 200000 | [429560266](https://explorer.solana.com/block/429560266) | submitted→processed→confirmed→finalized | 1758 ms | — |
-| 9 | `5e9800…82af` | 200000 | [429560496](https://explorer.solana.com/block/429560496) | submitted→processed→confirmed→finalized | 5396 ms | — |
-| 10 | `640d8a…ca7b` | 200000 | [429560197](https://explorer.solana.com/block/429560197) | submitted→processed→confirmed→finalized | 441 ms | — |
-| 11 | `659a16…e6dc` | 286080 | [429560230](https://explorer.solana.com/block/429560230) | submitted→processed→confirmed→finalized | 1047 ms | — |
-| 12 | `8f2ebe…ff4a` | 200000 | [429560473](https://explorer.solana.com/block/429560473) | submitted→processed→confirmed→finalized | 3094 ms | — |
-| 13 | `d5755a…0f2f` | 200000 | [429560186](https://explorer.solana.com/block/429560186) | submitted→processed→confirmed→finalized | 775 ms | — |
-| 14 | `f25d4a…ebc2` | 200000 | [429560244](https://explorer.solana.com/block/429560244) | submitted→processed→confirmed→finalized | 818 ms | — |
+| 1 | `42e9b5…cf3f` | 200000 | [429571833](https://explorer.solana.com/block/429571833) | submitted→processed→confirmed→finalized | 2564 ms | — |
+| 2 | `44805f…50d6` | 1000 | — | submitted | — | fee_too_low |
+| 3 | `449f04…49f2` | 200000 | [429571828](https://explorer.solana.com/block/429571828) | submitted→processed→confirmed→finalized | 5021 ms | — |
+| 4 | `47a259…955c` | 200000 | [429572113](https://explorer.solana.com/block/429572113) | submitted→processed→confirmed→finalized | 650 ms | — |
+| 5 | `534e41…74af` | 200000 | [429571838](https://explorer.solana.com/block/429571838) | submitted→processed→confirmed→finalized | 356 ms | — |
+| 6 | `5NUZvb…MtAa` | 235000 | — | submitted | — | expired_blockhash |
+| 7 | `5fa37c…6e12` | 200000 | [429571880](https://explorer.solana.com/block/429571880) | submitted→processed→confirmed→finalized | 862 ms | — |
+| 8 | `64f13e…aca8` | 200000 | [429571869](https://explorer.solana.com/block/429571869) | submitted→processed→confirmed→finalized | 343 ms | — |
+| 9 | `99d74d…b209` | 200000 | [429571814](https://explorer.solana.com/block/429571814) | submitted→processed→confirmed→finalized | 3444 ms | — |
+| 10 | `ad2f31…400f` | 200000 | [429571899](https://explorer.solana.com/block/429571899) | submitted→processed→confirmed→finalized | 512 ms | — |
+| 11 | `bb76cc…ca1a` | 200000 | [429571890](https://explorer.solana.com/block/429571890) | submitted→processed→confirmed→finalized | 706 ms | — |
+| 12 | `eaf0aa…608d` | 235000 | [429572096](https://explorer.solana.com/block/429572096) | submitted→processed→confirmed→finalized | 818 ms | — |
+| 13 | `f8efc3…8cb9` | 200000 | [429571858](https://explorer.solana.com/block/429571858) | submitted→processed→confirmed→finalized | 444 ms | — |
+| 14 | `fabbfd…90d0` | 200000 | [429571849](https://explorer.solana.com/block/429571849) | submitted→processed→confirmed→finalized | 896 ms | — |
 
 ## AI Decision Timeline
 
-15 AI decisions recorded during the run (the agent owns the tip + autonomous-retry decisions).
+15 decisions recorded during the run, all by the **AI agent** — it proposes the tip and owns the autonomous-retry decision (the deterministic core clamps each tip to the competitive floor; provider is shown per entry).
 
-**1. [timing]** submit now — confidence 0.85 · openai · 2026-06-29T00:39:04.841Z
+**1. [timing]** submit — confidence 0.93 · openai · 2026-06-29T01:57:24.354Z
 
-> CongestionScore is 0 (no network backlog) and slotsUntilLeaderChange is 1, so the current leader will step down imminently. Submitting now avoids the latency of waiting for the next leader slot, which may not be a Jito leader.
+> CongestionScore is 0 (no network congestion) and only 1 slot remains before leader change, so submitting now avoids added latency. No evidence the upcoming leader is a Jito validator, so no benefit in holding.
 
 `before: null  →  after: {"hold":false}`
 
-**2. [tip]** setTip — confidence 0.85 · openai · 2026-06-29T00:39:06.468Z
+**2. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T01:57:25.419Z
 
-> CongestionScore is 0, indicating minimal network load. To achieve reliable inclusion we stay within the reliable band (P75–P95). Choosing a tip modestly above the P75 floor (107,600 lamports) provides high inclusion probability without overpaying. A tip of 250,000 lamports balances cost and reliability.
+> CongestionScore is 0 (low load). Tip floor at the 75th percentile is 10035 lamports and at the 95th percentile is 100000 lamports. To balance cost and inclusion probability, we choose a tip slightly above the 75th percentile, well within the P75‑P95 band, at 12000 lamports.
 
-`before: null  →  after: {"tip":250000}`
+`before: null  →  after: {"tip":12000}`
 
-**3. [tip]** setTip — confidence 0.85 · openai · 2026-06-29T00:39:10.867Z
+**3. [tip]** set tip — confidence 0.86 · openai · 2026-06-29T01:57:29.577Z
 
-> CongestionScore is 0 (no congestion). Tip floor P75 is 107600 lamports; to ensure inclusion while avoiding excess cost we set tip slightly above P75 at 120000 lamports, staying within the P75‑P95 band.
+> CongestionScore=0 indicates low load; tipFloorP75Lamports=10035 gives reliable inclusion. Choosing a tip modestly above P75 (12000 lamports) stays in the P75‑P95 band while conserving cost.
 
-`before: null  →  after: {"tip":120000}`
+`before: null  →  after: {"tip":12000}`
 
-**4. [tip]** set tip to 150000 lamports — confidence 0.92 · openai · 2026-06-29T00:39:15.388Z
+**4. [tip]** Set Jito tip — confidence 0.87 · openai · 2026-06-29T01:57:34.064Z
 
-> CongestionScore is 0 (no congestion). To achieve reliable inclusion we stay within the P75‑P95 band. P75 is 107600 lamports; choosing 150000 puts us comfortably above P75 while far below the P95 noise floor, balancing cost and probability.
+> CongestionScore is 0 (low), tipFloorP50Lamports=5542, tipFloorP75Lamports=10035, tipFloorP95Lamports=100000. With low congestion we can stay at the lower end of the reliable band, so we choose the P75 floor (10035 lamports) to balance cost and inclusion probability.
 
-`before: null  →  after: {"tip":150000}`
+`before: null  →  after: {"tip":10035}`
 
-**5. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T00:39:19.616Z
+**5. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T01:57:38.125Z
 
-> CongestionScore is 0 (no congestion), so a tip anchored at the P75 level is sufficient; P50 is too low to reliably land, and P95 is unnecessary given the empty mempool.
+> CongestionScore is 0 (no congestion). To achieve reliable inclusion we must stay within the P75‑P95 band. With low congestion we can target the lower side of that band, selecting a tip modestly above tipFloorP75Lamports (~10k) but well below P95. Chosen tip ~28,000 lamports balances cost and landing probability.
 
-`before: null  →  after: {"tip":107600}`
+`before: null  →  after: {"tip":28028}`
 
-**6. [tip]** set tip — confidence 0.78 · openai · 2026-06-29T00:39:23.736Z
+**6. [tip]** set jito tip — confidence 0.85 · openai · 2026-06-29T01:57:42.115Z
 
-> CongestionScore is 0, indicating very low network load. The P75 floor is 107,600 lamports, and the P95 floor is 1,000,000 lamports. To secure inclusion without overpaying, we target a tip modestly above the P75 level but well below the P95 ceiling, selecting 150,000 lamports.
+> CongestionScore is 0, indicating a clear block space. The P75 floor is 10035 lamports, well above the noise floor, and P95 is 100000 lamports. With no congestion we can target the lower end of the reliable band, just above P75, to balance cost and inclusion probability.
 
-`before: null  →  after: {"tip":150000}`
+`before: null  →  after: {"tip":11000}`
 
-**7. [tip]** set Jito tip — confidence 0.85 · openai · 2026-06-29T00:39:28.152Z
+**7. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T01:57:46.428Z
 
-> CongestionScore is 0 (no network pressure). To achieve reliable inclusion we must tip within the P75–P95 band. With low congestion we target the lower side of that band, around 20% above the P75 floor (107600 lamports), yielding ~286080 lamports, well below the P95 noise floor but above the P75 threshold.
+> CongestionScore is 0, indicating low network load. The tip floor at the 75th percentile is 10035 lamports, which should reliably land in these conditions. Selecting a tip modestly above this level (~12000 lamports) provides a safety margin without overpaying.
 
-`before: null  →  after: {"tip":286080}`
+`before: null  →  after: {"tip":12000}`
 
-**8. [tip]** setTip — confidence 0.85 · openai · 2026-06-29T00:39:33.627Z
+**8. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T01:57:50.574Z
 
-> CongestionScore is 0 (no network pressure). To balance cost and inclusion probability we anchor at the P75 floor, which is sufficient when traffic is light, rather than pushing toward P95 which is needed only under higher congestion.
+> Low congestion (score 0) lets us stay near the lower end of the reliable band. Tip floor P75 is 10035 lamports and P95 is 100000 lamports; picking ~19 k lamports (~10 % above P75) balances cost and inclusion probability.
 
-`before: null  →  after: {"tip":107600}`
+`before: null  →  after: {"tip":19000}`
 
-**9. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T00:39:38.223Z
+**9. [tip]** setTip — confidence 0.78 · openai · 2026-06-29T01:57:54.748Z
 
-> CongestionScore is 0 (minimal congestion). To ensure reliable inclusion without overpaying, we target the lower part of the P75‑P95 band. Using tipFloorP75Lamports (107600) and moving ~10% toward tipFloorP95Lamports yields a tip of ~196800 lamports, comfortably above the P75 floor while staying far below the P95 ceiling.
+> CongestionScore is 0 (very low), so a tip near the lower end of the P75‑P95 band is sufficient. Using the live floor values, we pick a tip of 32,526 lamports, which is above the P75 floor (10,035) but well below the P95 floor (100,000), matching low‑congestion conditions.
 
-`before: null  →  after: {"tip":196800}`
+`before: null  →  after: {"tip":32526}`
 
-**10. [tip]** set tip — confidence 0.92 · openai · 2026-06-29T00:39:42.244Z
+**10. [tip]** setTip — confidence 0.86 · openai · 2026-06-29T01:57:58.873Z
 
-> CongestionScore is 0, indicating no network pressure. To achieve reliable inclusion we target the 75th‑percentile floor, which is the start of the reliable band. Tip set to tipFloorP75Lamports (107600 lamports).
+> CongestionScore is 0, indicating minimal network load. The tip floor P75 is 10035 lamports and P95 is 100000 lamports. With low congestion we can stay near the lower end of the reliable band; a tip of 11000 lamports comfortably exceeds P75 while remaining far below P95, balancing cost and landing probability.
 
-`before: null  →  after: {"tip":107600}`
+`before: null  →  after: {"tip":11000}`
 
-**11. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T00:39:46.414Z
+**11. [tip]** setTip — confidence 0.85 · openai · 2026-06-29T01:58:02.864Z
 
-> Congestion score is 0 (no congestion). To achieve reliable inclusion we target the P75–P95 band; with low congestion we stay near the lower end. Tip set just above the P75 floor (107600 lamports) at 115000 lamports.
+> CongestionScore is 0 (minimal), so a tip near the lower end of the reliable band suffices. Using the P75 floor (10035 lamports) plus a modest safety margin yields ~12000 lamports, staying within the P75‑P95 window while avoiding excess cost.
 
-`before: null  →  after: {"tip":115000}`
+`before: null  →  after: {"tip":12000}`
 
-**12. [tip]** set tip — confidence 0.92 · openai · 2026-06-29T00:39:50.445Z
+**12. [tip]** set tip — confidence 0.85 · openai · 2026-06-29T01:58:06.874Z
 
-> CongestionScore is 0 indicating minimal network load; the tipFloorP75Lamports (107600) is sufficient to achieve reliable inclusion while staying well above the noisy P50 floor.
+> CongestionScore is 0 (no congestion), so a tip just above the P75 floor is sufficient. P75 is 10035 lamports; choosing 20000 lamports places us comfortably in the P75–P95 band without overspending on the P95 extreme, maximizing cost‑efficiency while maintaining high inclusion probability.
 
-`before: null  →  after: {"tip":107600}`
+`before: null  →  after: {"tip":20000}`
 
-**13. [tip]** setTip — confidence 0.86 · openai · 2026-06-29T00:39:54.813Z
+**13. [tip]** set tip to 10035 lamports — confidence 0.88 · openai · 2026-06-29T01:58:11.112Z
 
-> CongestionScore is 0 (no congestion), so we can stay near the lower end of the reliable band. P75 floor is 107600 lamports; picking a tip well above P75 but far below P95 conserves funds while still giving a high inclusion probability.
+> CongestionScore is 0, indicating no current network pressure. The tipFloorP75Lamports is 10035, placing us at the start of the reliable P75‑P95 band. With zero congestion we can target the lower bound of this band to minimize cost while still maintaining a good inclusion chance.
 
-`before: null  →  after: {"tip":330700}`
+`before: null  →  after: {"tip":10035}`
 
-**14. [retry]** Refresh blockhash and resubmit — confidence 0.94 · openai · 2026-06-29T00:41:06.795Z
+**14. [retry]** RefreshBlockhashAndResubmit — confidence 0.97 · openai · 2026-06-29T01:59:20.190Z
 
-> FailureClass=ExpiredBlockhash indicates the recent blockhash is no longer valid. Telemetry shows a high lastTipLamports (200000) well above the tipFloorP50 (21402), so the existing tip is sufficient. We must refresh the blockhash and reuse the current tip for a retry.
+> FailureClass=ExpiredBlockhash indicates the recent blockhash is no longer valid. Telemetry shows lastTipLamports=235000 which comfortably exceeds tipFloorP50Lamports=5542, so the current tip is sufficient. Refreshing the blockhash and resubmitting with the same tip is safe and likely to succeed.
 
-`before: null  →  after: {"refresh_blockhash":true,"tip":200000}`
+`before: null  →  after: {"refresh_blockhash":true,"tip":235000}`
 
-**15. [retry]** retry with increased tip — confidence 0.95 · openai · 2026-06-29T00:41:13.162Z
+**15. [retry]** retry — confidence 0.92 · openai · 2026-06-29T01:59:26.667Z
 
-> FailureClass FeeTooLow indicates the submitted fee (1000 lamports) is below the network's median tip floor (21402 lamports). No blockhash expiration reported, so we keep the current blockhash and raise the tip to meet the floor.
+> FailureClass=FeeTooLow; current tip 1000 lamports is below tipFloorP50 5542 lamports, so transaction was rejected for insufficient fee. No blockhash expiration indicated, so we keep the same blockhash and increase tip above the floor.
 
-`before: null  →  after: {"refresh_blockhash":false,"tip":21402}`
+`before: null  →  after: {"refresh_blockhash":false,"tip":5600}`
 
