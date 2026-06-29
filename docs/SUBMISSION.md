@@ -19,7 +19,15 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
   [429572113](https://explorer.solana.com/block/429572113)); the failure→recover→land chains render at the
   top of the log as explicit, explorer-verifiable **AI Recovery Chains**, and all 15 decisions in the
   timeline are real `openai`/Groq (zero deterministic fallback).
-- **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
+- **Control room (live dashboard):** `pnpm --filter @prometheon/dashboard dev` → http://localhost:3000 —
+  the **Recovery Rail**: the 14 committed bundles ride Submitted→Processed→Confirmed→Finalized; the 2
+  injected failures detour through the AI operator (two divergent levers — raise tip vs. refresh blockhash)
+  and self-heal to explorer-linked finalized slots. Honest `live | simulated | proof-replay` toggle
+  (defaults to a deterministic replay of the committed run — real data, no faked liveness); `?t=34500`
+  parks on the both-recovered money shot. The dashboard is the operator's console, **not** the product —
+  a pinned strip shows the real API (`submit(signedTx) → receipt{finalized_slot | reason}`).
+- **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md); record the
+  Recovery Rail at `/?t=34500` (the self-heal) then `/` (the live loop).
 
 ## Requirement → where it's satisfied
 
@@ -80,7 +88,8 @@ NETWORK=mainnet cargo run -p prometheon-core --bin proof -- --count 12
 pnpm --filter @prometheon/ai-agent start                                 # terminal 1
 NETWORK=mainnet ./scripts/run-proof.sh 12 low-tip:1,stale-blockhash:1
 cargo run -p prometheon-telemetry --bin export-log     # → logs/lifecycle-log.{json,md}
-pnpm --filter @prometheon/dashboard dev                # http://localhost:3000 (live timeline)
+pnpm --filter @prometheon/dashboard dev                # http://localhost:3000 — the Recovery Rail control room
+                                                       #   (defaults to proof-replay; /?t=34500 = the self-heal)
 ```
 
 ## Why it should win (judging axes)

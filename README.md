@@ -82,6 +82,26 @@ back to a finalized landing. It **consumes** transport + estimators; it does not
 - **Deliberate chaos** — fault injection (blockhash expiry, low tip, …) exercises the AI's
   adaptation; the recovery is captured in the lifecycle log + decision timeline.
 
+## Control room — watch the AI self-heal
+
+The dashboard is the **operator's control room** (and the demo surface), not the product — real users
+integrate PrometheonOS headless (`submit(signedTx) → receipt{finalized_slot | reason}`; the pinned
+receipt strip shows that contract). It's one full-bleed instrument, the **Recovery Rail**: each committed
+mainnet bundle is a token riding four stations (Submitted→Processed→Confirmed→Finalized); the two injected
+failures visibly detour — rose fault token, the AI's classified lever inline (`fee_too_low → ↑ raise tip`;
+`expired_blockhash → ↻ refresh blockhash`), the **AI OPERATOR** node pulsing — and recover to a finalized
+landing whose slot **links to the explorer**. Two failures, two divergent correct levers: the causal
+contract, legible at a glance. Hover a recovery row to spotlight its decision + reasoning in the timeline.
+
+```bash
+pnpm --filter @prometheon/dashboard dev     # → http://localhost:3000  (defaults to the proof-replay)
+```
+
+It has three **honest** sources — a `live | simulated | proof-replay` toggle. `proof-replay`
+deterministically replays the *committed* mainnet run (real on-chain data + real explorer links), so the
+self-heal plays on cue without faking liveness. Scrub the demo with `?t=<ms>` — e.g. `/?t=34500` parks on
+the frame where **both** recoveries have healed to finalized, explorer-linked slots (the money shot).
+
 ## Architecture (high level)
 
 Rust core engine (ingest · bundle · lifecycle · failure · retry · netmodel · telemetry ·
@@ -143,8 +163,9 @@ cargo run -p prometheon-core --bin prometheon
 #    LLM_PROVIDER=anthropic|openai|ollama|mock  (mock needs no API key).
 LLM_PROVIDER=mock pnpm --filter @prometheon/ai-agent start
 
-# 3. Dashboard — live ops console (auto-falls back to a mock feed when the bus is quiet).
-pnpm --filter @prometheon/dashboard dev          # http://localhost:3000
+# 3. Dashboard — the "Recovery Rail" control room (defaults to the committed proof-replay; toggle
+#    live | simulated | proof-replay). See "Control room" above.
+pnpm --filter @prometheon/dashboard dev          # http://localhost:3000  (try /?t=34500 for the money shot)
 
 # 4. Proof — assemble + simulate (free dry-run) or submit + stream-track (live) N bundles, with
 #    deterministic injected failures. The live run persists Bundle/Lifecycle/Failure telemetry.

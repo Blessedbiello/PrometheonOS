@@ -111,16 +111,26 @@ function Row({
   chain,
   retry,
   explorerBase,
+  onHighlight,
 }: {
   chain: Chain;
   retry: DecisionRow | undefined;
   explorerBase: string;
+  onHighlight?: (failureClass: string | null) => void;
 }) {
   const failedAttempt = chain.attempts.find(isFailed);
   const recovered = chain.attempts.length > 1 && chain.attempts.some(isLanded) && !!failedAttempt;
+  const failureClass = failedAttempt?.failure_class ?? null;
 
   return (
-    <div className="relative h-8 border-b border-zinc-900/70">
+    <div
+      className={
+        "relative h-8 border-b border-zinc-900/70 transition-colors " +
+        (recovered ? "cursor-pointer hover:bg-amber-400/[0.04]" : "")
+      }
+      onMouseEnter={recovered ? () => onHighlight?.(failureClass) : undefined}
+      onMouseLeave={recovered ? () => onHighlight?.(null) : undefined}
+    >
       {/* connecting hairline behind the tokens */}
       <div
         className="absolute top-1/2 h-px -translate-y-1/2 bg-zinc-800"
@@ -162,10 +172,13 @@ export function ExecutionRail({
   bundles,
   decisions,
   explorerBase = "https://explorer.solana.com",
+  onHighlight,
 }: {
   bundles: BundleRow[];
   decisions: DecisionRow[];
   explorerBase?: string;
+  /** Hovering a recovery row reports its failure class so the timeline can spotlight that decision. */
+  onHighlight?: (failureClass: string | null) => void;
 }) {
   const chains = toChains(bundles);
   const retries = decisions.filter((d) => d.decision_type === "retry");
@@ -173,6 +186,13 @@ export function ExecutionRail({
     if (!cls) return undefined;
     const want = cls.toLowerCase().replace(/[^a-z]/g, "");
     return retries.find((d) => d.reasoning.toLowerCase().replace(/[^a-z]/g, "").includes(want));
+  };
+  // The failure class a retry decision recovered (from its reasoning) — for the operator-hover spotlight.
+  const classOf = (d: DecisionRow | undefined): string | null => {
+    const r = (d?.reasoning ?? "").toLowerCase().replace(/[^a-z]/g, "");
+    if (r.includes("feetoolow")) return "fee_too_low";
+    if (r.includes("expiredblockhash")) return "expired_blockhash";
+    return null;
   };
 
   const landed = bundles.filter(isLanded).length;
@@ -231,7 +251,13 @@ export function ExecutionRail({
             <p className="mono py-6 text-center text-[11px] text-zinc-600">awaiting bundles…</p>
           ) : (
             chains.map((c) => (
-              <Row key={c.base} chain={c} retry={retryByClass(c.attempts.find(isFailed)?.failure_class)} explorerBase={explorerBase} />
+              <Row
+                key={c.base}
+                chain={c}
+                retry={retryByClass(c.attempts.find(isFailed)?.failure_class)}
+                explorerBase={explorerBase}
+                onHighlight={onHighlight}
+              />
             ))
           )}
         </div>
@@ -242,9 +268,11 @@ export function ExecutionRail({
         className={
           "relative mt-2 flex items-center gap-3 rounded-sm border px-3 py-1.5 transition-colors duration-500 " +
           (activeRetry
-            ? "border-amber-400/50 bg-amber-400/5"
+            ? "cursor-pointer border-amber-400/50 bg-amber-400/5"
             : "border-zinc-800 bg-zinc-950/40")
         }
+        onMouseEnter={activeRetry ? () => onHighlight?.(classOf(lastRetry)) : undefined}
+        onMouseLeave={activeRetry ? () => onHighlight?.(null) : undefined}
       >
         <span
           className={

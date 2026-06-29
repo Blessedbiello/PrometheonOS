@@ -25,6 +25,8 @@ export default function Page() {
   const [feed, setFeed] = useState<FeedState>("off");
   // Default to the committed-mainnet proof replay so the recovery hero plays on load — honestly badged.
   const [source, setSource] = useState<SourceChoice>("proof");
+  // Hovering a recovery row on the rail spotlights its decision in the timeline (and vice-versa).
+  const [highlight, setHighlight] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +79,7 @@ export default function Page() {
       <div className="flex-1 space-y-4 p-4">
         {/* HERO — the closed control loop made geometry */}
         {snap ? (
-          <ExecutionRail bundles={snap.bundles} decisions={snap.decisions} />
+          <ExecutionRail bundles={snap.bundles} decisions={snap.decisions} onHighlight={setHighlight} />
         ) : (
           <Skeleton label="Execution Rail" tall />
         )}
@@ -85,7 +87,11 @@ export default function Page() {
         {/* Operator's decision drawer + a compact health readout */}
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 lg:col-span-7">
-            {snap ? <Decisions decisions={snap.decisions} /> : <Skeleton label="AI Decision Timeline" />}
+            {snap ? (
+              <Decisions decisions={snap.decisions} highlight={highlight} />
+            ) : (
+              <Skeleton label="AI Decision Timeline" />
+            )}
           </div>
           <div className="col-span-12 lg:col-span-5">
             {snap ? <NetworkHealth health={snap.health} /> : <Skeleton label="Network Health" />}
