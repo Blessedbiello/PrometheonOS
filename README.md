@@ -84,6 +84,13 @@ back to a finalized landing. It **consumes** transport + estimators; it does not
 
 ## Control room — watch the AI self-heal
 
+![PrometheonOS Recovery Rail — two mainnet bundles fail and the AI self-heals them to finalized, explorer-linked slots](docs/assets/recovery-rail.png)
+
+_The Recovery Rail (proof-replay of the committed mainnet run). `b11` under-tipped → the AI **raises the
+tip**; `b12` expired-blockhash → the AI **refreshes the blockhash** — two failures, two correct levers,
+both recovered to finalized slots. A 35 s screen capture is in
+[`docs/assets/recovery-rail-demo.mp4`](docs/assets/recovery-rail-demo.mp4)._
+
 The dashboard is the **operator's control room** (and the demo surface), not the product — real users
 integrate PrometheonOS headless (`submit(signedTx) → receipt{finalized_slot | reason}`; the pinned
 receipt strip shows that contract). It's one full-bleed instrument, the **Recovery Rail**: each committed
