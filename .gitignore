@@ -29,3 +29,6 @@ logs/*.scratch.*
 
 # Docker volumes
 infra/data/
+
+# Dashboard: proof-replay data copied from repo-root logs/ at build (source of truth is logs/)
+dashboard/proof-data/

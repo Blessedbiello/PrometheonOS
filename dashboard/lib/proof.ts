@@ -70,7 +70,10 @@ let cached: { entries: LogEntry[]; decisions: DecisionRow[] } | null = null;
 function loadRun(): { entries: LogEntry[]; decisions: DecisionRow[] } {
   if (cached) return cached;
   const candidates = [
-    join(process.cwd(), "..", "logs"),
+    // Bundled copy inside the app — the only path that survives a serverless/Vercel build, where
+    // `../logs` (outside the app root) isn't traced. Populated by scripts/copy-proof-data.mjs at build.
+    join(process.cwd(), "proof-data"),
+    join(process.cwd(), "..", "logs"), // repo-root logs/ (local dev/start from the dashboard dir)
     join(process.cwd(), "logs"),
   ];
   let lastErr: unknown = null;
