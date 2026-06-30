@@ -62,7 +62,8 @@ back to a finalized landing. It **consumes** transport + estimators; it does not
   attempt 2 (landed) as a linked **recovery chain** in the log.
 - **AI reasons over network state, not a constant** — given congestion `0.62` it targets the P75–P95
   band (≈26,000 lamports); given an `ExpiredBlockhash` it returns `refresh_blockhash:true` (see
-  [`logs/ai-decision-trace.md`](logs/ai-decision-trace.md)). Different inputs → different, defensible levers.
+  [`logs/ai-decision-trace.md`](logs/ai-decision-trace.md) — an illustrative agent trace, a separate run
+  from the committed mainnet proof). Different inputs → different, defensible levers.
 - **Network Health Model** — a live network-condition intelligence layer (congestion, slot
   stability, leader reliability, confirmation-latency variance, bundle landing probability,
   expiry risk) that the AI consumes.
@@ -91,9 +92,13 @@ tip**; `b12` expired-blockhash → the AI **refreshes the blockhash** — two fa
 both recovered to finalized slots. A 35 s screen capture is in
 [`docs/assets/recovery-rail-demo.mp4`](docs/assets/recovery-rail-demo.mp4)._
 
-The dashboard is the **operator's control room** (and the demo surface), not the product — real users
-integrate PrometheonOS headless (`submit(signedTx) → receipt{finalized_slot | reason}`; the pinned
-receipt strip shows that contract). It's one full-bleed instrument, the **Recovery Rail**: each committed
+The dashboard is the **operator's control room** (and the demo surface), not the product — the product
+is a **real callable surface** (a Rust library fn + a `submit` CLI + a loopback HTTP endpoint) that hands
+the engine a strategy and returns a lifecycle receipt:
+`submit(SubmitRequest) → Receipt{ Landed{slot, final_stage, attempts} | Failed{reason, last_class, attempts} }`
+(engine-custody — the engine signs, tips, tracks, and autonomously retries; see
+[`docs/INTEGRATION.md`](docs/INTEGRATION.md)). The pinned receipt strip shows that contract. It's one
+full-bleed instrument, the **Recovery Rail**: each committed
 mainnet bundle is a token riding four stations (Submitted→Processed→Confirmed→Finalized); the two injected
 failures visibly detour — rose fault token, the AI's classified lever inline (`fee_too_low → ↑ raise tip`;
 `expired_blockhash → ↻ refresh blockhash`), the **AI OPERATOR** node pulsing — and recover to a finalized
@@ -108,6 +113,13 @@ It has three **honest** sources — a `live | simulated | proof-replay` toggle. 
 deterministically replays the *committed* mainnet run (real on-chain data + real explorer links), so the
 self-heal plays on cue without faking liveness. Scrub the demo with `?t=<ms>` — e.g. `/?t=34500` parks on
 the frame where **both** recoveries have healed to finalized, explorer-linked slots (the money shot).
+
+**Why a replay is the default (and still honest):** a live mainnet run is sparse and slow, so the hero
+won't fire on cue — so the dashboard *defaults* to the deterministic `proof-replay` (real committed data,
+real explorer links, **never** badged `live`). The **`live`** source is first-class: it subscribes to the
+engine's telemetry over NATS and renders in real time; if no fresh event arrives within ~15 s it falls
+back to `simulated` rather than show a stale feed, so the `live` badge is always truthful. Nothing is
+faked and nothing is hidden — the badge always tells you exactly what you're watching.
 
 ## Architecture (high level)
 
@@ -132,7 +144,7 @@ ai-agent/      TypeScript AI agent (pluggable LLM provider)
 dashboard/     Next.js realtime UI
 contracts/     JSON Schema (generated from Rust) + generated TS types
 infra/         docker-compose: NATS, Postgres+Timescale, Prometheus
-docs/          ARCHITECTURE, FAILURE-TAXONOMY, TELEMETRY-SCHEMA, EXPERIMENTS, RFCs
+docs/          ARCHITECTURE · INTEGRATION · FAILURE-TAXONOMY · TELEMETRY-SCHEMA · EXPERIMENTS · RFCs
 scripts/       proof run + lifecycle-log export
 logs/          exported lifecycle logs (explorer-verifiable slots)
 ```
@@ -191,6 +203,29 @@ Regenerate the cross-language contract after changing a Rust telemetry type:
 ./scripts/gen-contracts.sh      # Rust (schemars) → contracts/json-schema → contracts/ts
 ```
 
+### Submit → Receipt — the product surface
+
+The dashboard is optional; PrometheonOS is **headless infrastructure**. Hand the engine a strategy and
+get a lifecycle receipt back — as a Rust library call, a CLI, or a loopback HTTP endpoint:
+
+```bash
+# CLI: submit a strategy, print the Receipt JSON (devnet is free; mainnet needs a funded wallet)
+NETWORK=mainnet cargo run -p prometheon-core --bin submit -- --transfer-lamports 1 --max-attempts 3
+
+# HTTP: serve POST /submit on loopback (127.0.0.1:9180), then curl it
+NETWORK=mainnet cargo run -p prometheon-core --bin submit -- --serve
+curl -s 127.0.0.1:9180/submit -d '{"transfer_lamports":1,"max_attempts":3,"deadline_secs":180}'
+# → {"outcome":"landed","slot":429572113,"final_stage":"finalized","attempts":2}
+```
+
+The engine signs (engine-custody), tips, tracks the lifecycle over one Yellowstone stream, and
+autonomously retries — returning `Receipt::Landed{slot, final_stage, attempts}` or
+`Receipt::Failed{reason, last_class, attempts}`, **derived from the same telemetry as the lifecycle log**
+(so a receipt reconciles with the exported log). The HTTP endpoint binds **loopback-only** and is
+unauthenticated by design (it signs with a funded wallet). Full guide — including the
+`Submitter`/`DecisionSource`/`run_saga` seam for deep integration — in
+[`docs/INTEGRATION.md`](docs/INTEGRATION.md).
+
 ## Status
 
 **Validated live (read-only spine).** Ingestion → network-health model → NATS / Postgres /
@@ -214,7 +249,7 @@ exported [`logs/lifecycle-log.{json,md}`](logs/lifecycle-log.md). The committed 
 **12 bundles landed, 2 failed of 14 submissions** — every landed bundle advancing
 `submitted→processed→confirmed→finalized`, slots **verifiable on the explorer** (e.g.
 [429572113](https://explorer.solana.com/block/429572113)), submit→confirmed deltas of **~0.4–1.8 s** for
-most landings (max ~5 s; the two AI-recovered attempts confirmed in **~0.7 s**), and **15 real AI
+most landings (max ~5 s; the two AI-recovered attempts confirmed in **0.65 s and 0.82 s**), and **15 real AI
 decisions, all by the agent** (Groq `gpt-oss-120b` via the OpenAI-compatible provider; 1 timing + 12
 tip + 2 retry) in the log's AI Decision Timeline. Both injected faults were classified from real signals —
 the sub-floor tip as **`fee_too_low`**, the expired blockhash as **`expired_blockhash`** — and each was
@@ -238,7 +273,7 @@ the network-health model tracks `confirm_latency_variance_ms` and folds it into 
 > Provenance: confirmed by the committed funded run — [`logs/lifecycle-log.md`](logs/lifecycle-log.md)
 > records real per-bundle submit→confirmed deltas of **~0.4–1.8 s** for most of the mainnet landings
 > (small and stable, exactly the healthy regime described above; max ~5 s, and the two AI-recovered
-> attempts confirmed in ~0.7 s), each advancing `processed → confirmed → finalized` with
+> attempts confirmed in 0.65 s and 0.82 s), each advancing `processed → confirmed → finalized` with
 > explorer-verifiable slots.
 
 **2. Why should you never use `finalized` commitment when fetching a blockhash for a time-sensitive transaction?**

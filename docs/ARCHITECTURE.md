@@ -188,6 +188,18 @@ the read-only engine and in that committed run:
   (`export::render_decisions_markdown`). The path is integration-tested without a network
   (`tests/proof_pipeline.rs`, `tests/saga_pipeline.rs`). Fault injection
   (`--inject low-tip,stale-blockhash`) guarantees the bounty's ≥2 failure cases.
+- **Submit → Receipt surface (`prometheon_core::submit::submit`).** PrometheonOS now exposes a real,
+  callable product surface — `submit(SubmitRequest) → Receipt` — three ways over the *same* tested
+  `run_saga` (unchanged): a Rust library fn, a `--bin submit` CLI, and a loopback HTTP endpoint
+  (`--serve`, `POST /submit` on `127.0.0.1:9180`). v1 is **engine-custody** (the honest framing): the
+  engine holds the wallet and signs, tips, tracks the lifecycle, and **autonomously retries** on a
+  non-landing. `Receipt` = `Landed { slot, final_stage, attempts } | Failed { reason, last_class,
+  attempts }`, **derived from the same `Bundle`/`Lifecycle`/`Failure` telemetry as the lifecycle log**
+  (the same `export::build_log` assembler), so a receipt always reconciles with the exported
+  `logs/lifecycle-log.json`. The HTTP endpoint binds **loopback-only and is unauthenticated by design**
+  — it signs with the funded wallet, so localhost is the trust boundary, the same posture as `/metrics`.
+  Caller-custody `submit(signed_tx)` with a durable nonce is documented future work. See
+  [`INTEGRATION.md`](INTEGRATION.md).
 - **One contract.** Rust telemetry types (`schemars`) generate `contracts/json-schema/*` and the TS
   types; CI fails on drift. The dashboard consumes the live NATS feed and labels its status honestly
   (`source: live|mock` → "live"/"simulated"), never showing a live indicator over the mock feed.

@@ -180,6 +180,62 @@ pub async fn prepare_attempt(
     })
 }
 
+/// Probe **real** on-chain / Jito error data for a non-landed bundle so the failure is classified from
+/// observed signals (block height vs `lastValidBlockHeight`, `isBlockhashValid`, decoded
+/// `getBundleStatuses.err`, or an inflight terminal failure) — not the injection tag. Shared by the
+/// proof's `LiveSubmitter` and the product `EngineSubmitter`; `cached_blockhash` is the base's last
+/// blockhash (each caller looks it up in its own per-base cache).
+pub async fn probe_failure_signals(
+    rpc: &RpcClient,
+    jito: &BlockEngineClient,
+    sb: &crate::proof_run::SubmittedBundle,
+    floor_p50: u64,
+    cached_blockhash: Option<crate::rpc::BlockhashInfo>,
+) -> prometheon_failure::FailureSignals {
+    let blockhash_valid = match &cached_blockhash {
+        Some(b) => rpc.is_blockhash_valid(&b.blockhash).await.ok(),
+        None => None,
+    };
+    let block_height = rpc.block_height().await.ok();
+    let last_valid_block_height = cached_blockhash.as_ref().map(|b| b.last_valid_block_height);
+
+    let (on_chain_error, bundle_status_failed) = match jito
+        .get_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
+        .await
+    {
+        Ok(statuses) => match statuses.value.iter().find(|e| e.bundle_id == sb.bundle_id) {
+            Some(e) if e.has_error() => (
+                e.err.as_ref().map(crate::proof_run::decode_on_chain_error),
+                false,
+            ),
+            _ => {
+                let failed = jito
+                    .get_inflight_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
+                    .await
+                    .ok()
+                    .map(|inf| {
+                        inf.value
+                            .iter()
+                            .any(|e| e.bundle_id == sb.bundle_id && e.status.is_terminal_failure())
+                    })
+                    .unwrap_or(false);
+                (None, failed)
+            }
+        },
+        Err(_) => (None, false),
+    };
+
+    crate::proof_run::signals_from_observation(&crate::proof_run::FailureObservation {
+        tip_lamports: sb.tip_lamports,
+        tip_floor_p50_lamports: floor_p50,
+        blockhash_valid,
+        block_height,
+        last_valid_block_height,
+        on_chain_error,
+        bundle_status_failed,
+    })
+}
+
 /// A correlated lifecycle advance produced by a stream event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Correlated {

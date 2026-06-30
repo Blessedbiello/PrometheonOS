@@ -99,10 +99,25 @@ spotlight its decision + reasoning in the timeline. It defaults to an **honest `
 committed run (real on-chain data, real links — no faked liveness; toggle `live | simulated | proof-replay`).
 A 35-second screen capture is committed at `docs/assets/recovery-rail-demo.mp4`.
 
-### How it's actually used (the honest framing)
-Real users never touch the dashboard — PrometheonOS is **headless infrastructure**. A keeper/bot/protocol
-hands it a signed instruction and gets back a lifecycle receipt: `submit(signedTx) → receipt{ finalized_slot
-| reason }`. The dashboard is the **operator's control room** (and this demo surface), not the product.
+### How it's actually used (a real, callable surface)
+Real users never touch the dashboard — PrometheonOS is **headless infrastructure**, and the product is now a
+**real, callable surface**: a keeper/bot/protocol hands the engine a strategy to land and gets back a
+`Receipt`. It's the *same* tested saga behind three entry points — a Rust **library** fn, a **CLI**, and a
+loopback **HTTP** endpoint:
+
+```bash
+curl -s 127.0.0.1:9180/submit -d '{"transfer_lamports":1,"max_attempts":3,"deadline_secs":180}'
+# → {"outcome":"landed","slot":429572113,"final_stage":"finalized","attempts":2}
+```
+
+```
+submit(SubmitRequest) → Receipt{ Landed{slot, final_stage, attempts} | Failed{reason, last_class, attempts} }
+```
+
+v1 is **engine-custody** — the engine signs, tips, tracks and autonomously retries (refresh-on-expiry needs the
+signing key, so the retry we advertise is always real); a caller-custody `submit(signed_tx)` with a durable
+nonce is named future work. The dashboard is the **operator's control room** (and this demo surface), not the
+product. Full integration guide: `docs/INTEGRATION.md`.
 
 ### The three README questions (answered from real behavior)
 - **`processed`→`confirmed` delta = consensus health,** not RPC latency: time for a block we've already
@@ -136,6 +151,7 @@ cargo run -p prometheon-telemetry --bin export-log          # → logs/lifecycle
 
 ### Links
 - **Code (open source):** https://github.com/Blessedbiello/PrometheonOS
+- **Integration (call it headless):** `docs/INTEGRATION.md` — Rust library · CLI · loopback HTTP `submit → Receipt`.
 - **Architecture document (public):** https://crystalline-koi-7f8.notion.site/ARCHITECTURE-PUBLIC-38faa89d75a18064b1dffd857154b272
 - **Lifecycle log (the proof):** `logs/lifecycle-log.md` (+ `.json`)
 - **Demo video:** https://github.com/Blessedbiello/PrometheonOS/blob/main/docs/assets/recovery-rail-demo.mp4 (35 s, in-repo)

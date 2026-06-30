@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: PrometheonOS — Submit API
+  version: 0.1.0
+  description: >
+    The callable product surface. Hand the engine a strategy to land; it builds, signs (engine-custody),
+    tips, tracks the full lifecycle over one Yellowstone stream, and **autonomously retries** on a
+    non-landing — returning a Receipt derived from the same telemetry as the committed lifecycle log.
+    Served by `cargo run -p prometheon-core --bin submit -- --serve`.
+  contact:
+    url: https://github.com/Blessedbiello/PrometheonOS
+
+servers:
+  - url: http://127.0.0.1:9180
+    description: >
+      Loopback only. The endpoint signs with a funded wallet, so — exactly like the Prometheus
+      `/metrics` exporter and the dashboard — localhost is the trust boundary. It binds loopback-only
+      (refuses a non-loopback host) and is unauthenticated by design; do not expose it. Auth is future
+      work. Override the bind address with the `SUBMIT_ADDR` env var.
+
+paths:
+  /submit:
+    post:
+      summary: Submit a strategy and get a lifecycle Receipt
+      description: >
+        Runs the engine-custody saga for one logical bundle and returns when it has landed (confirmed)
+        or exhausted its attempts/deadline. The signer is loaded server-side from the engine config and
+        never crosses the wire.
+      requestBody:
+        required: false
+        description: All fields optional; an empty body uses the defaults.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitRequest'
+            examples:
+              default:
+                value: { transfer_lamports: 1, max_attempts: 3, deadline_secs: 180 }
+      responses:
+        '200':
+          description: The Receipt (landed or failed). HTTP 200 even for a Failed outcome — the failure is in the body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+              examples:
+                landed:
+                  value: { outcome: landed, slot: 429572113, final_stage: finalized, attempts: 2 }
+                failed:
+                  value: { outcome: failed, reason: "did not land; final attempt classified `expired_blockhash`", last_class: expired_blockhash, attempts: 3 }
+        '500':
+          description: The submit could not start (e.g. RPC/Jito/Yellowstone/NATS unreachable, or no funded wallet).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+
+components:
+  schemas:
+    SubmitRequest:
+      type: object
+      description: >
+        The HTTP request body. (The richer Rust `SubmitRequest` — strategy + signer source — is resolved
+        server-side; the wire body carries only these tunables.)
+      properties:
+        transfer_lamports:
+          type: integer
+          format: uint64
+          default: 1
+          description: The self-transfer strategy amount (v1 ships SelfTransfer; arbitrary instructions are future work).
+        max_attempts:
+          type: integer
+          format: uint32
+          default: 3
+          minimum: 1
+          description: Attempts (incl. autonomous retries) before abandoning.
+        deadline_secs:
+          type: integer
+          format: uint64
+          default: 180
+          description: Wall-clock budget for the whole submit, including retries.
+    Receipt:
+      oneOf:
+        - $ref: '#/components/schemas/Landed'
+        - $ref: '#/components/schemas/Failed'
+      discriminator:
+        propertyName: outcome
+      description: >
+        Derived from the same Bundle/Lifecycle/Failure telemetry as `logs/lifecycle-log.json` (one
+        assembler), so a receipt is always reconcilable with the exported log. Carries no wallet/key/
+        signature material.
+    Landed:
+      type: object
+      required: [outcome, slot, final_stage, attempts]
+      properties:
+        outcome: { type: string, enum: [landed] }
+        slot: { type: integer, format: uint64, description: The landed attempt's slot (explorer-verifiable). }
+        final_stage:
+          type: string
+          enum: [confirmed, finalized]
+          description: Honest about the observed commitment bar (finalization may lag the deadline).
+        attempts: { type: integer, format: uint32, description: "How many tries it took (a recovered bundle reports 2)." }
+    Failed:
+      type: object
+      required: [outcome, reason, attempts]
+      properties:
+        outcome: { type: string, enum: [failed] }
+        reason: { type: string }
+        last_class:
+          type: [string, "null"]
+          description: "Real-signal classification of the final attempt (e.g. expired_blockhash, fee_too_low)."
+        attempts: { type: integer, format: uint32 }

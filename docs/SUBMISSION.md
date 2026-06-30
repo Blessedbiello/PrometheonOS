@@ -25,7 +25,9 @@ Jito bundles with dynamically-computed tips, tracks each across every commitment
   and self-heal to explorer-linked finalized slots. Honest `live | simulated | proof-replay` toggle
   (defaults to a deterministic replay of the committed run — real data, no faked liveness); `?t=34500`
   parks on the both-recovered money shot. The dashboard is the operator's console, **not** the product —
-  a pinned strip shows the real API (`submit(signedTx) → receipt{finalized_slot | reason}`).
+  the product is now a **real callable surface** (Rust library + CLI + loopback HTTP), and a pinned strip shows
+  the API `submit(SubmitRequest) → Receipt{ Landed{slot, final_stage, attempts} | Failed{reason, last_class, attempts} }`
+  (engine-custody: the engine signs/tips/tracks/retries; see [`docs/INTEGRATION.md`](INTEGRATION.md)).
 - **Demo video:** _‹paste link›_ — shot list in [`docs/DEMO-SCRIPT.md`](DEMO-SCRIPT.md); record the
   Recovery Rail at `/?t=34500` (the self-heal) then `/` (the live loop).
 
@@ -81,6 +83,11 @@ cargo run -p prometheon-core --bin preflight           # connectivity ✓/✗
 
 # Free dry-run (no funds): validates the whole assembly path against live mainnet
 NETWORK=mainnet cargo run -p prometheon-core --bin proof -- --count 12
+
+# The product surface — hand the engine a strategy, get a Receipt back (it signs/tips/tracks/retries):
+NETWORK=mainnet cargo run -p prometheon-core --bin submit -- --serve     # loopback POST /submit
+curl -s 127.0.0.1:9180/submit -d '{"transfer_lamports":1,"max_attempts":3,"deadline_secs":180}'
+# → {"outcome":"landed","slot":429572113,"final_stage":"finalized","attempts":2}   # see docs/INTEGRATION.md
 
 # Live proof (funded wallet + agent running): the explorer-verifiable log + AI reasoning.
 # The committed log was produced with Groq (any OpenAI-compatible host works; or anthropic/ollama):

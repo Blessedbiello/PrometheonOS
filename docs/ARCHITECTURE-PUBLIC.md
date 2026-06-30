@@ -15,8 +15,9 @@ recovery decision. Proven on mainnet.*
 | **Key components** | §6 Component breakdown |
 | **Data flow between services** | §5 (diagram) · §7 Event flow · §8 AI decision pipeline |
 | **Infrastructure decisions** | §15 Infrastructure decisions · §3 Design philosophy |
-| **Failure handling strategy** | §11 Failure handling · §9 Lifecycle state machine · §10 Retry state machine |
+| **Failure handling strategy** | §11 Failure handling · §9 Lifecycle state machine · §10 Retry saga loop |
 | **AI agent responsibilities** | §8 AI decision pipeline · §3 Design philosophy |
+| **Usage / product surface** | §8a Submit → Receipt · `docs/INTEGRATION.md` |
 | **Operational understanding** | §4 Lifecycle deep dive · §20 Lessons learned · §22 Operational Q&A |
 | **Proof it ran on real infra** | §19 Cost · §21 Implementation status & live validation |
 
@@ -234,10 +235,39 @@ and were lifted to it, so the **floor — not the model's exact number — set t
 provable, outcome-changing lever is therefore the **retry decision itself** (the `refresh_blockhash`
 binary), and the proof shows two failures resolved with two *divergent* correct remedies.
 
+## 8a. Submit → Receipt — the callable product surface
+
+PrometheonOS is headless infrastructure: the dashboard is the operator's control room, and the product
+is a **callable surface** — `submit(SubmitRequest) → Receipt`. It's available three ways, all backed by
+the *same* tested `run_saga`: a Rust library function (`prometheon_core::submit::submit`), a `submit`
+CLI, and a loopback HTTP endpoint (`--serve`, `POST 127.0.0.1:9180/submit`). The engine builds, signs,
+tips, tracks the full lifecycle over one Yellowstone stream, and **autonomously retries** on a
+non-landing, returning:
+
+- `Receipt::Landed { slot, final_stage, attempts }` — `final_stage` is honest about the observed bar
+  (`confirmed` | `finalized`); a recovered bundle reports `attempts: 2` with the *landed* attempt's slot.
+- `Receipt::Failed { reason, last_class, attempts }` — `last_class` is the real-signal classification.
+
+**Engine-custody (the honest framing).** The saga re-signs on a refresh-on-expiry retry, which needs the
+signing key — so v1 is engine-custody: the engine holds the wallet and signs. A caller-signed
+`submit(signed_tx)` that still supports autonomous refresh-on-expiry needs a durable nonce; that's
+documented future work, so the autonomous retry we advertise is always real.
+
+**The receipt *is* the lifecycle log.** A `Receipt` is derived from the *same* `Bundle`/`Lifecycle`/
+`Failure` telemetry, via the same `export::build_log` assembler that produces the committed
+`logs/lifecycle-log.json` — so a receipt is always reconcilable with the exported log, not a separate,
+drift-prone codepath.
+
+**Security.** The HTTP endpoint signs with a funded wallet, so it binds **loopback-only** (refuses a
+non-loopback host) and is unauthenticated by design — localhost is the trust boundary, exactly like the
+Prometheus `/metrics` exporter and the dashboard. Full usage in `docs/INTEGRATION.md`.
+
 ## 9. Transaction lifecycle state machine
 
 Driven primarily by the Yellowstone stream (slot status + tx status); RPC is a cross-check. Illegal
 transitions are rejected, so the recorded history is always a valid path.
+
+These are the real `LifecycleStage` variants in `prometheon-lifecycle`. They track **one attempt**:
 
 ```mermaid
 stateDiagram-v2
@@ -252,36 +282,38 @@ stateDiagram-v2
   Submitted --> Expired: blockHeight > lastValidBlockHeight
   Submitted --> Dropped: leader skipped + no land in window
 
-  Failed --> Retrying: classifier + AI says retryable
-  Expired --> Retrying: refresh blockhash + recalc tip
-  Dropped --> Retrying: rebroadcast to next Jito leader
-  Retrying --> Submitted: resubmit (attempt n+1)
-  Retrying --> Abandoned: attempt cap / non-retryable
-  Abandoned --> [*]
+  Failed --> [*]: non-landing → saga retry orchestrator (§10)
+  Expired --> [*]: non-landing → saga retry orchestrator (§10)
+  Dropped --> [*]: non-landing → saga retry orchestrator (§10)
 ```
 
-Each transition records `{slot, ts, delta_ms_from_prev}` → a `LifecycleEvent`.
+Each transition records `{slot, ts, delta_ms_from_prev}` → a `LifecycleEvent`. A non-landing
+(`Failed`/`Expired`/`Dropped`) is terminal for that *attempt*; **retry is orchestrated at the saga
+level (§10)**, which launches a *fresh* attempt — a new `bundle_id` with its own lifecycle — rather than
+mutating the failed attempt's history. (`Retrying`/`Abandoned` are saga states, not lifecycle stages.)
 
-## 10. Retry orchestrator state machine
+## 10. Retry orchestrator — the autonomous saga loop
+
+This is the real `run_saga` loop (`crates/prometheon-core/src/saga.rs`), modeled as a saga over
+injectable traits rather than an enum state machine — see [RFC 0003](RFCs/0003-retry-orchestrator.md):
 
 ```mermaid
-stateDiagram-v2
-  [*] --> Idle
-  Idle --> Classifying: failure event
-  Classifying --> Deciding: class + confidence
-  Deciding --> Abandon: non-retryable OR attempts ≥ cap
-  Deciding --> Preparing: AI returns retry plan
-  Preparing --> RefreshBlockhash: blockhash invalid / expiry-risk high
-  Preparing --> RecalcTip: tip below target for current conditions
-  RefreshBlockhash --> RecalcTip
-  RecalcTip --> Backoff
-  Preparing --> Backoff: no param change needed
-  Backoff --> Resubmit: jittered delay elapsed
-  Resubmit --> Idle: new bundle_id handed to lifecycle
-  Abandon --> [*]
+flowchart TB
+  A["attempt non-landing<br/>(failed tx-status OR give-up watermark passed)"] --> B["classify failure<br/>probe_failure → real RPC/Jito signals, else heuristic"]
+  B --> C["emit Failure telemetry"]
+  C --> D["ask AI for a retry Decision<br/>DecisionSource over NATS · None → deterministic policy"]
+  D --> E["resolve_retry: combine the AI choice with safety invariants"]
+  E -->|"attempt cap / non-retryable"| F["abandon → Receipt::Failed"]
+  E -->|"retry"| G["launch attempt n+1<br/>refresh blockhash? re-price? per the plan"]
+  G --> H{"landed (confirmed)?"}
+  H -->|"yes"| I["done → Receipt::Landed"]
+  H -->|"no"| A
 ```
 
-Every entry into `Resubmit` is justified by a persisted AI `Decision` — **no hardcoded retry flow.**
+Every resubmit is justified by a persisted AI `Decision` — **no hardcoded retry flow.** The forced
+refresh-on-expiry and the attempt cap are **deterministic safety the model cannot remove**. The whole
+loop — including recovery (attempt 1 fails → attempt 2 lands) — is regression-tested with **no network**
+in `tests/saga_pipeline.rs` and `tests/submit_receipt.rs`.
 
 ## 11. Failure handling strategy
 

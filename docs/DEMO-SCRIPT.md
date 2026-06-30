@@ -55,11 +55,20 @@ block on mainnet. Narrate: "Every landing is a real, verifiable slot — this ra
 cut to `logs/lifecycle-log.md` → the **AI Recovery Chains** section threading attempt 1 → attempt 2.)
 
 **1:30–1:50 — Honest scope (this builds trust, don't skip).**
-Point at the **PRODUCT SURFACE** strip at the bottom: `submit(signedTx) → receipt{finalized_slot | reason}`.
-Narrate: "Real users never touch this dashboard — it's the operator's control room. The product is the
-integration: a signed tx in, a lifecycle receipt out." Flick the source toggle `proof-replay → live → sim`
-to show the honest badges. Say the limits out loud: "Replay of a committed mainnet run — real data; the
-floor clamps the AI's tip to a competitive minimum; leader-window is approximated via the RPC schedule."
+Point at the **PRODUCT SURFACE** strip at the bottom:
+`submit(SubmitRequest) → Receipt{ Landed{slot, final_stage, attempts} | Failed{reason, last_class, attempts} }`.
+Narrate: "Real users never touch this dashboard — it's the operator's control room. The product is a **real,
+callable surface**: hand the engine a strategy, get a lifecycle `Receipt` back — as a Rust library, a CLI, or a
+loopback HTTP endpoint." **Optional on-camera moment** — drop to a terminal and show the actual API returning a
+receipt ("the dashboard is the console; here's the real API"):
+```bash
+curl -s 127.0.0.1:9180/submit -d '{"transfer_lamports":1,"max_attempts":3,"deadline_secs":180}'
+# → {"outcome":"landed","slot":429572113,"final_stage":"finalized","attempts":2}
+```
+Flick the source toggle `proof-replay → live → sim` to show the honest badges. Say the limits out loud:
+"Replay of a committed mainnet run — real data; the engine signs (caller-custody durable-nonce `submit` is
+future work); the floor clamps the AI's tip to a competitive minimum; leader-window is approximated via the
+RPC schedule." (Integration details: `docs/INTEGRATION.md`.)
 
 **1:50–2:05 — Close.**
 "Stream-confirmed lifecycle, dynamic tips, real-signal failure classification, and an AI that **owns the
@@ -74,6 +83,7 @@ PrometheonOS." One beat on the architecture diagram (`docs/DIAGRAMS.md`) or the 
 - [ ] The explorer block page for slot `429572113` (or `429572096`) with the URL in frame.
 - [ ] `logs/lifecycle-log.md` — the **AI Recovery Chains** section (attempt 1 → attempt 2, linked).
 - [ ] The dashboard with the **`proof-replay`** badge (honest provenance) + the receipt strip visible.
+- [ ] (Optional) A terminal showing `curl …/submit` returning a real `Receipt` — "the dashboard is the console; here's the API".
 
 ## Optional live flex (only if you want to show it's not pre-baked)
 Toggle the badge to **LIVE**, then in a terminal run a small funded mainnet proof and let the rail update

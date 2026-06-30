@@ -1,7 +1,7 @@
 # PrometheonOS — Diagrams
 
 Mermaid diagrams (render on GitHub). These are the canonical source for the figures in the public
-architecture document. Marked _(target)_ where they describe behaviour implemented in a later phase.
+architecture document — all reflect the implemented system.
 
 ---
 
@@ -68,7 +68,7 @@ flowchart TB
 
 ---
 
-## 2. Transaction lifecycle state machine _(target — Phase 3)_
+## 2. Transaction lifecycle state machine
 
 Driven primarily by the Yellowstone stream (slot status + tx status); RPC is a cross-check.
 
@@ -78,49 +78,63 @@ stateDiagram-v2
   Submitted --> Processed: tx seen in block (stream) / slot PROCESSED
   Processed --> Confirmed: slot CONFIRMED (≥⅔ stake vote)
   Confirmed --> Finalized: slot FINALIZED (rooted, 32-deep)
-  Finalized --> [*]
+  Finalized --> [*]: landed (terminal success)
 
   Submitted --> Failed: on-chain err / bundle Failed
   Processed --> Failed: slot DEAD (fork dropped)
+  Confirmed --> Failed: slot DEAD (fork dropped)
   Submitted --> Expired: blockHeight > lastValidBlockHeight
   Submitted --> Dropped: leader skipped + no land in window
 
-  Failed --> Retrying: classifier + AI says retryable
-  Expired --> Retrying: refresh blockhash + recalc tip
-  Dropped --> Retrying: rebroadcast to next Jito leader
-  Retrying --> Submitted: resubmit (attempt n+1)
-  Retrying --> Abandoned: attempt cap / non-retryable
-  Abandoned --> [*]
+  Failed --> [*]: terminal (this attempt)
+  Expired --> [*]: terminal (this attempt)
+  Dropped --> [*]: terminal (this attempt)
+
+  note right of Dropped
+    A non-landing (Failed / Expired / Dropped) is terminal for THIS
+    attempt. The saga-level retry orchestrator (§3 / RFC 0003) then
+    classifies the failure and may launch a fresh attempt — a NEW
+    lifecycle starting again at Submitted. Retrying / Abandoned are
+    NOT lifecycle stages.
+  end note
 ```
 
-Each transition records `{slot, ts, delta_ms_from_prev}` → `LifecycleEvent`.
+Each transition records `{slot, ts, delta_ms_from_prev}` → `LifecycleEvent`. Forward-skips
+(e.g. `Submitted → Confirmed`, `Processed → Finalized`) are accepted when the stream delivers a
+later commitment without the intermediate one; backward/illegal transitions are rejected.
+
+Retry is orchestrated at the saga level (see §3 / RFC 0003), not as a lifecycle stage.
 
 ---
 
-## 3. Retry orchestrator state machine _(target — Phase 6; RFC 0003)_
+## 3. Retry orchestrator — the saga loop (RFC 0003)
+
+A *model* of the real saga loop in `crates/prometheon-core/src/saga.rs` (`run_saga` →
+`reconcile` → `fail_and_retry` → `resolve_retry` → `launch`). The "state" is per-base bookkeeping
+over the one shared Yellowstone stream, not an enum — see RFC 0003.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Idle
-  Idle --> Classifying: failure event
-  Classifying --> Deciding: class + confidence
-  Deciding --> Abandon: non-retryable OR attempts ≥ cap
-  Deciding --> Preparing: AI returns retry plan
-  Preparing --> RefreshBlockhash: blockhash invalid / expiry-risk high
-  Preparing --> RecalcTip: tip below target for current conditions
-  RefreshBlockhash --> RecalcTip
-  RecalcTip --> Backoff
-  Preparing --> Backoff: no param change needed
-  Backoff --> Resubmit: jittered delay elapsed
-  Resubmit --> Idle: new bundle_id handed to lifecycle
+  [*] --> InFlight: launch attempt (Submitted)
+  InFlight --> Landed: reached confirmed (drains to finalized)
+  Landed --> [*]
+
+  InFlight --> Classify: non-landing (failed tx-status OR give-up watermark)
+  Classify --> Decide: FailureClass (probe_failure → real RPC/Jito signals; else heuristic)
+  Decide --> Resolve: emit Failure, ask AI for Decision over NATS (None → deterministic policy)
+  Resolve --> Abandon: attempt cap OR non-retryable class
+  Resolve --> Launch: retry plan (forced refresh-on-expiry; AI tip, clamped)
+  Launch --> InFlight: attempt n+1 (new bundle_id, Submitted)
   Abandon --> [*]
 ```
 
-Every entry into `Resubmit` is justified by a persisted AI `Decision` (no hardcoded retry flow).
+Every resubmit is justified by a persisted AI `Decision`; the forced refresh-on-expiry and the
+attempt cap are deterministic safety the model cannot remove. Modeled as a saga over injectable
+traits (RFC 0003), regression-tested with no network in `tests/saga_pipeline.rs`.
 
 ---
 
-## 4. AI decision pipeline _(target — Phase 5)_
+## 4. AI decision pipeline
 
 ```mermaid
 sequenceDiagram
@@ -146,7 +160,7 @@ sequenceDiagram
 
 ---
 
-## 5. Event flow timeline (single bundle, happy path) _(target)_
+## 5. Event flow timeline (single bundle, happy path)
 
 ```mermaid
 sequenceDiagram

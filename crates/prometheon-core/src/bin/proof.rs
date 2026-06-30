@@ -442,58 +442,11 @@ impl Submitter for LiveSubmitter {
     }
 
     /// Probe real on-chain / Jito error data for a non-landed bundle so the saga classifies the
-    /// failure from observed signals (real blockhash expiry, decoded `getBundleStatuses.err`, or an
-    /// inflight terminal failure) — not the injection tag.
+    /// failure from observed signals — not the injection tag. Delegates to the shared
+    /// [`proof::probe_failure_signals`] (the same probe the product `EngineSubmitter` uses).
     async fn probe_failure(&self, sb: &SubmittedBundle) -> Option<FailureSignals> {
-        // The base's last blockhash → check expiry from real chain state.
         let bh = self.blockhash_cache.lock().await.get(&sb.base_id).cloned();
-        let blockhash_valid = match &bh {
-            Some(b) => self.rpc.is_blockhash_valid(&b.blockhash).await.ok(),
-            None => None,
-        };
-        let block_height = self.rpc.block_height().await.ok();
-        let last_valid_block_height = bh.as_ref().map(|b| b.last_valid_block_height);
-
-        // Real Jito error data for this bundle (best-effort: decode getBundleStatuses.err, else
-        // consult the fast inflight view for a terminal failure).
-        let (on_chain_error, bundle_status_failed) = match self
-            .jito
-            .get_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
-            .await
-        {
-            Ok(statuses) => match statuses.value.iter().find(|e| e.bundle_id == sb.bundle_id) {
-                Some(e) if e.has_error() => {
-                    (e.err.as_ref().map(proof_run::decode_on_chain_error), false)
-                }
-                _ => {
-                    let failed = self
-                        .jito
-                        .get_inflight_bundle_statuses(std::slice::from_ref(&sb.bundle_id))
-                        .await
-                        .ok()
-                        .map(|inf| {
-                            inf.value.iter().any(|e| {
-                                e.bundle_id == sb.bundle_id && e.status.is_terminal_failure()
-                            })
-                        })
-                        .unwrap_or(false);
-                    (None, failed)
-                }
-            },
-            Err(_) => (None, false),
-        };
-
-        Some(proof_run::signals_from_observation(
-            &proof_run::FailureObservation {
-                tip_lamports: sb.tip_lamports,
-                tip_floor_p50_lamports: self.floor_p50,
-                blockhash_valid,
-                block_height,
-                last_valid_block_height,
-                on_chain_error,
-                bundle_status_failed,
-            },
-        ))
+        Some(proof::probe_failure_signals(&self.rpc, &self.jito, sb, self.floor_p50, bh).await)
     }
 }
 

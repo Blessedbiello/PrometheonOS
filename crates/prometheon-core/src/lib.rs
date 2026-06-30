@@ -13,9 +13,14 @@ pub mod rpc;
 pub mod saga;
 pub mod sinks;
 pub mod submission;
+pub mod submit;
 pub mod wallet;
 
 pub use config::{Config, Network};
 pub use saga::{run_saga, AttemptSpec, BaseBundle, DecisionSource, SagaConfig, Submitter};
 pub use sinks::{EventSink, Sinks};
 pub use submission::{next_saga_action, SagaAction, SubmissionOutcome};
+pub use submit::{
+    log_from_events, receipt_from_log, run_submit, Receipt, SignerSource, SubmitRequest,
+    SubmitStrategy,
+};
