@@ -119,8 +119,10 @@ Next.js realtime dashboard, with Postgres + TimescaleDB persistence and Promethe
 failures) — it is **never** in the sub-second leader-window hot path, which stays deterministic
 in Rust.
 
-> Full architecture document: _(public Notion/Google Docs link — added at submission)_.
-> In-repo source: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> **Full architecture document (public):**
+> [crystalline-koi-7f8.notion.site/ARCHITECTURE-PUBLIC](https://crystalline-koi-7f8.notion.site/ARCHITECTURE-PUBLIC-38faa89d75a18064b1dffd857154b272)
+> — in-repo source: [`docs/ARCHITECTURE-PUBLIC.md`](docs/ARCHITECTURE-PUBLIC.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> **Demo video (35 s):** [`docs/assets/recovery-rail-demo.mp4`](https://github.com/Blessedbiello/PrometheonOS/blob/main/docs/assets/recovery-rail-demo.mp4).
 
 ## Repository layout
 

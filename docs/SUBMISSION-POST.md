@@ -1,6 +1,8 @@
 # PrometheonOS — submission post
 
-> Paste-ready submission text. Pick the short or long version; fill the two `‹…›` link placeholders.
+> Paste-ready submission text. Pick the short or long version. Links are filled in: the architecture
+> doc points to the public Notion page and the demo to the in-repo GitHub video (swap for a
+> YouTube/Loom link if you host one).
 
 ---
 
@@ -31,8 +33,8 @@ self-heal to slots you can click open on the explorer.
 
 - **Repo:** https://github.com/Blessedbiello/PrometheonOS
 - **Lifecycle log (the proof):** `logs/lifecycle-log.md` — 12 landed + 2 AI-recovered of 14, explorer-verifiable
-- **Architecture doc:** ‹public URL›
-- **Demo:** ‹video URL› (or `docs/assets/recovery-rail-demo.mp4` in the repo)
+- **Architecture doc:** https://crystalline-koi-7f8.notion.site/ARCHITECTURE-PUBLIC-38faa89d75a18064b1dffd857154b272
+- **Demo:** https://github.com/Blessedbiello/PrometheonOS/blob/main/docs/assets/recovery-rail-demo.mp4 (35 s Recovery-Rail self-heal)
 
 ---
 
@@ -134,9 +136,9 @@ cargo run -p prometheon-telemetry --bin export-log          # → logs/lifecycle
 
 ### Links
 - **Code (open source):** https://github.com/Blessedbiello/PrometheonOS
-- **Architecture document (public):** ‹paste Notion / Google-Docs URL›
+- **Architecture document (public):** https://crystalline-koi-7f8.notion.site/ARCHITECTURE-PUBLIC-38faa89d75a18064b1dffd857154b272
 - **Lifecycle log (the proof):** `logs/lifecycle-log.md` (+ `.json`)
-- **Demo video:** ‹paste link› — or `docs/assets/recovery-rail-demo.mp4`
+- **Demo video:** https://github.com/Blessedbiello/PrometheonOS/blob/main/docs/assets/recovery-rail-demo.mp4 (35 s, in-repo)
 - **Live dashboard:** `pnpm --filter @prometheon/dashboard dev` → http://localhost:3000 (`/?t=34500` = the self-heal)
 
 ---
